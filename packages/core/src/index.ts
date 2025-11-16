@@ -68,6 +68,20 @@ export type {
   CompiledReport,
 } from "./services/openai";
 
+export {
+  initializeBraveSearch,
+  searchWeb,
+  searchWithRetry,
+  searchMultipleQueries,
+  deduplicateResults,
+  normalizeUrl,
+} from "./services/brave-search";
+export type {
+  SearchFilters,
+  BraveSearchResult,
+  BraveSearchResponse,
+} from "./services/brave-search";
+
 // Hooks
 export { useAuth } from "./hooks/useAuth";
 export { useProjects } from "./hooks/useProjects";
