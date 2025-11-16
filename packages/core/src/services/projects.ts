@@ -10,19 +10,49 @@ import {
   doc,
   addDoc,
   getDocs,
+  updateDoc,
   onSnapshot,
   query,
   orderBy,
   Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Project, NewProject } from "../models/project";
+import type { Project, NewProject, ProjectStatus } from "../models/project";
 
 /**
  * Get the projects collection reference for a user
  */
 function getProjectsCollection(userId: string) {
   return collection(db, "users", userId, "projects");
+}
+
+/**
+ * Calculate next run time based on frequency
+ */
+function calculateNextRunAt(frequency: "daily" | "weekly" | "monthly"): number {
+  const now = new Date();
+  
+  switch (frequency) {
+    case "daily":
+      // Next day at 8 AM UTC
+      now.setUTCDate(now.getUTCDate() + 1);
+      now.setUTCHours(8, 0, 0, 0);
+      break;
+    case "weekly":
+      // Next Monday at 8 AM UTC
+      const daysUntilMonday = (8 - now.getUTCDay()) % 7 || 7;
+      now.setUTCDate(now.getUTCDate() + daysUntilMonday);
+      now.setUTCHours(8, 0, 0, 0);
+      break;
+    case "monthly":
+      // 1st of next month at 8 AM UTC
+      now.setUTCMonth(now.getUTCMonth() + 1);
+      now.setUTCDate(1);
+      now.setUTCHours(8, 0, 0, 0);
+      break;
+  }
+  
+  return now.getTime();
 }
 
 /**
@@ -34,12 +64,25 @@ export async function createProject(
 ): Promise<Project> {
   try {
     const now = Date.now();
-    const projectData = {
+    
+    // Set default settings if not provided
+    const settings = data.settings || {
+      relevancyThreshold: 60,
+      minResults: 5,
+      maxResults: 20,
+    };
+    
+    const projectData: Omit<Project, "id"> = {
       userId,
       title: data.title,
       description: data.description,
       frequency: data.frequency,
       resultsDestination: data.resultsDestination,
+      searchParameters: data.searchParameters,
+      settings,
+      deliveryConfig: data.deliveryConfig,
+      status: "draft", // New projects start as draft
+      nextRunAt: calculateNextRunAt(data.frequency),
       createdAt: now,
       updatedAt: now,
     };
@@ -100,4 +143,68 @@ export function subscribeToProjects(
       console.error("Error subscribing to projects:", error);
     }
   );
+}
+
+/**
+ * Update project status
+ */
+export async function updateProjectStatus(
+  userId: string,
+  projectId: string,
+  status: ProjectStatus
+): Promise<void> {
+  try {
+    const projectRef = doc(db, "users", userId, "projects", projectId);
+    await updateDoc(projectRef, {
+      status,
+      updatedAt: Date.now(),
+    });
+  } catch (error) {
+    console.error("Error updating project status:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update project execution tracking after a research run
+ */
+export async function updateProjectExecution(
+  userId: string,
+  projectId: string,
+  updates: {
+    status?: ProjectStatus;
+    lastRunAt?: number;
+    nextRunAt?: number;
+    lastError?: string;
+  }
+): Promise<void> {
+  try {
+    const projectRef = doc(db, "users", userId, "projects", projectId);
+    await updateDoc(projectRef, {
+      ...updates,
+      updatedAt: Date.now(),
+    });
+  } catch (error) {
+    console.error("Error updating project execution:", error);
+    throw error;
+  }
+}
+
+/**
+ * Activate a project (change from draft to active)
+ */
+export async function activateProject(
+  userId: string,
+  projectId: string
+): Promise<void> {
+  try {
+    const projectRef = doc(db, "users", userId, "projects", projectId);
+    await updateDoc(projectRef, {
+      status: "active",
+      updatedAt: Date.now(),
+    });
+  } catch (error) {
+    console.error("Error activating project:", error);
+    throw error;
+  }
 }
