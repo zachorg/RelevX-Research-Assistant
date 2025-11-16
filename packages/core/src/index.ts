@@ -51,6 +51,23 @@ export {
   activateProject,
 } from "./services/projects";
 
+export {
+  initializeOpenAI,
+  generateSearchQueries,
+  generateSearchQueriesWithRetry,
+  analyzeRelevancy,
+  analyzeRelevancyWithRetry,
+  compileReport,
+  compileReportWithRetry,
+} from "./services/openai";
+export type {
+  GeneratedQuery,
+  ContentToAnalyze,
+  RelevancyResult,
+  ResultForReport,
+  CompiledReport,
+} from "./services/openai";
+
 // Hooks
 export { useAuth } from "./hooks/useAuth";
 export { useProjects } from "./hooks/useProjects";
