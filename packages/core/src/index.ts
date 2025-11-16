@@ -82,6 +82,17 @@ export type {
   BraveSearchResponse,
 } from "./services/brave-search";
 
+export {
+  extractContent,
+  extractContentWithRetry,
+  extractMultipleContents,
+  getContentPreview,
+} from "./services/content-extractor";
+export type {
+  ExtractedContent,
+  ExtractionOptions,
+} from "./services/content-extractor";
+
 // Hooks
 export { useAuth } from "./hooks/useAuth";
 export { useProjects } from "./hooks/useProjects";
