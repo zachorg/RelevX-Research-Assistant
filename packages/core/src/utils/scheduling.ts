@@ -1,6 +1,6 @@
 /**
  * Scheduling utilities for calculating project execution times
- * 
+ *
  * Handles timezone conversions, nextRunAt calculations, and validation
  * for user-specified delivery times and frequencies.
  */
@@ -18,7 +18,7 @@ export function validateDeliveryTime(time: string): boolean {
   if (!timeRegex.test(time)) {
     return false;
   }
-  
+
   // Check 15-minute increment
   const [, minutes] = time.split(":");
   const minutesNum = parseInt(minutes, 10);
@@ -38,11 +38,11 @@ export function validateFrequency(
   if (!lastRunAt) {
     return true; // Never run before, always valid
   }
-  
+
   const now = Date.now();
   const timeSinceLastRun = now - lastRunAt;
   const oneDayMs = 24 * 60 * 60 * 1000;
-  
+
   // Prevent running more than once per day (daily is the maximum frequency)
   return timeSinceLastRun >= oneDayMs;
 }
@@ -63,32 +63,32 @@ export function calculateNextRunAt(
 ): number {
   // Parse delivery time
   const [hours, minutes] = deliveryTime.split(":").map(Number);
-  
+
   // Get current time in the user's timezone
   const nowInUserTz = convertToTimezone(new Date(), timezone);
-  
+
   // Create a date object for today at the delivery time in user's timezone
   let nextRun = new Date(nowInUserTz);
   nextRun.setHours(hours, minutes, 0, 0);
-  
+
   // If we've already passed the delivery time today, move to the next period
   if (nextRun.getTime() <= Date.now()) {
     nextRun = addFrequencyPeriod(nextRun, frequency);
   }
-  
+
   // Apply frequency rules
   switch (frequency) {
     case "daily":
       // Already handled above - next occurrence at delivery time
       break;
-      
+
     case "weekly":
       // Move to next week if needed
       while (nextRun.getTime() <= Date.now()) {
         nextRun = addFrequencyPeriod(nextRun, frequency);
       }
       break;
-      
+
     case "monthly":
       // Move to next month if needed
       while (nextRun.getTime() <= Date.now()) {
@@ -96,7 +96,7 @@ export function calculateNextRunAt(
       }
       break;
   }
-  
+
   // Convert back to UTC timestamp
   return nextRun.getTime();
 }
@@ -109,7 +109,7 @@ export function calculateNextRunAt(
  */
 function addFrequencyPeriod(date: Date, frequency: Frequency): Date {
   const newDate = new Date(date);
-  
+
   switch (frequency) {
     case "daily":
       newDate.setDate(newDate.getDate() + 1);
@@ -121,7 +121,7 @@ function addFrequencyPeriod(date: Date, frequency: Frequency): Date {
       newDate.setMonth(newDate.getMonth() + 1);
       break;
   }
-  
+
   return newDate;
 }
 
@@ -151,7 +151,7 @@ export function isProjectDue(
   if (!nextRunAt) {
     return false; // No scheduled time, don't run
   }
-  
+
   const now = Date.now();
   // Allow a 1-minute grace period in case the cron runs slightly late
   return nextRunAt <= now + gracePeriodMs;
@@ -163,7 +163,7 @@ export function isProjectDue(
  */
 export function formatTimeOptions(): string[] {
   const options: string[] = [];
-  
+
   for (let hour = 0; hour < 24; hour++) {
     for (let minute = 0; minute < 60; minute += 15) {
       const hourStr = hour.toString().padStart(2, "0");
@@ -171,7 +171,7 @@ export function formatTimeOptions(): string[] {
       options.push(`${hourStr}:${minuteStr}`);
     }
   }
-  
+
   return options;
 }
 
@@ -235,4 +235,3 @@ export function detectUserTimezone(): string {
     return "UTC";
   }
 }
-
