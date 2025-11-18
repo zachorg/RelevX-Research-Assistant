@@ -1,6 +1,6 @@
 /**
  * Research Scheduler Service
- * 
+ *
  * Runs cron jobs every 15 minutes to execute research for projects
  * that are due based on their delivery time and timezone.
  */
@@ -31,7 +31,9 @@ interface Project {
 /**
  * Query active projects that are due for execution
  */
-async function getDueProjects(): Promise<Array<{ userId: string; project: Project }>> {
+async function getDueProjects(): Promise<
+  Array<{ userId: string; project: Project }>
+> {
   const db = getFirestore();
   const now = Date.now();
   const dueProjects: Array<{ userId: string; project: Project }> = [];
@@ -93,25 +95,21 @@ async function executeProjectResearch(
   });
 
   try {
-    // Import the research engine dynamically to avoid loading it at startup
-    const { executeResearchForProject } = await import(
-      "../../../packages/core/src/services/research-engine"
-    );
-    
-    // Import service initializations
-    const { initializeOpenAI } = await import(
-      "../../../packages/core/src/services/openai"
-    );
-    const { initializeBraveSearch } = await import(
-      "../../../packages/core/src/services/brave-search"
-    );
+    // Import the research engine and services from core package
+    const {
+      executeResearchForProject,
+      initializeOpenAI,
+      initializeBraveSearch,
+    } = await import("core");
 
     // Initialize services if not already done
     const openaiKey = process.env.OPENAI_API_KEY;
     const braveKey = process.env.BRAVE_SEARCH_API_KEY;
 
     if (!openaiKey || !braveKey) {
-      throw new Error("Missing required API keys (OPENAI_API_KEY or BRAVE_SEARCH_API_KEY)");
+      throw new Error(
+        "Missing required API keys (OPENAI_API_KEY or BRAVE_SEARCH_API_KEY)"
+      );
     }
 
     initializeOpenAI(openaiKey);
@@ -194,7 +192,7 @@ async function runSchedulerJob(): Promise<void> {
     // Process projects in batches to avoid overwhelming the system
     for (let i = 0; i < dueProjects.length; i += maxConcurrent) {
       const batch = dueProjects.slice(i, i + maxConcurrent);
-      
+
       logger.debug(`Processing batch ${i / maxConcurrent + 1}`, {
         batchSize: batch.length,
       });
@@ -266,7 +264,7 @@ async function startScheduler(): Promise<void> {
   // Set up cron job to run every 15 minutes
   // Cron format: */15 * * * * = every 15 minutes
   const cronExpression = "*/15 * * * *";
-  
+
   logger.info("Setting up cron job", { schedule: cronExpression });
 
   cron.schedule(cronExpression, async () => {
@@ -298,4 +296,3 @@ startScheduler().catch((error) => {
   });
   process.exit(1);
 });
-
