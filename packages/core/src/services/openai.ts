@@ -143,7 +143,7 @@ Generate 5-7 diverse search queries. Return ONLY a JSON object with this structu
 
   try {
     const response = await client.chat.completions.create({
-      model: "gpt-4-turbo-preview",
+      model: "gpt-5-nano",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -319,7 +319,7 @@ Analyze each piece of content and return ONLY a JSON object with this structure:
 
   try {
     const response = await client.chat.completions.create({
-      model: "gpt-3.5-turbo", // Use cheaper model for analysis
+      model: "gpt-5-nano", // Use cheaper model for analysis
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -482,7 +482,7 @@ Return ONLY a JSON object with this structure:
 
   try {
     const response = await client.chat.completions.create({
-      model: "gpt-4-turbo-preview", // Use better model for final report
+      model: "gpt-4.1-mini", // Use better model for final report
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
