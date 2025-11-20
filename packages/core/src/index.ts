@@ -52,37 +52,6 @@ export {
 } from "./services/projects";
 
 export {
-  initializeOpenAI,
-  generateSearchQueries,
-  generateSearchQueriesWithRetry,
-  analyzeRelevancy,
-  analyzeRelevancyWithRetry,
-  compileReport,
-  compileReportWithRetry,
-} from "./services/openai";
-export type {
-  GeneratedQuery,
-  ContentToAnalyze,
-  RelevancyResult,
-  ResultForReport,
-  CompiledReport,
-} from "./services/openai";
-
-export {
-  initializeBraveSearch,
-  searchWeb,
-  searchWithRetry,
-  searchMultipleQueries,
-  deduplicateResults,
-  normalizeUrl,
-} from "./services/brave-search";
-export type {
-  SearchFilters,
-  BraveSearchResult,
-  BraveSearchResponse,
-} from "./services/brave-search";
-
-export {
   extractContent,
   extractContentWithRetry,
   extractMultipleContents,
@@ -96,11 +65,42 @@ export type {
 export {
   executeResearchForProject,
   executeResearchBatch,
+  setDefaultProviders,
 } from "./services/research-engine";
 export type {
   ResearchResult,
   ResearchOptions,
 } from "./services/research-engine";
+
+// Provider Interfaces
+export type {
+  LLMProvider,
+  SearchProvider,
+  GeneratedQuery,
+  SearchFilters,
+  SearchResultItem,
+  SearchResponse,
+} from "./interfaces";
+
+// Provider Implementations
+export { OpenAIProvider, createOpenAIProvider } from "./services/llm";
+export {
+  BraveSearchProvider,
+  createBraveSearchProvider,
+} from "./services/search";
+
+// Provider Factories
+export {
+  createLLMProvider,
+  createSearchProvider,
+  createProviders,
+} from "./providers";
+export type {
+  LLMProviderType,
+  SearchProviderType,
+  LLMProviderConfig,
+  SearchProviderConfig,
+} from "./providers";
 
 // Utils
 export { normalizeUrl as utilNormalizeUrl } from "./utils/deduplication";
