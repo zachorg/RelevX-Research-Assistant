@@ -5,7 +5,10 @@
  * Stored in Firestore at root level: adminNotifications/{notificationId}
  */
 
-export type NotificationType = "research_failure" | "delivery_failure" | "system_error";
+export type NotificationType =
+  | "research_failure"
+  | "delivery_failure"
+  | "system_error";
 
 export type NotificationSeverity = "low" | "medium" | "high" | "critical";
 
@@ -18,21 +21,21 @@ export interface AdminNotification {
   id: string; // Firestore document ID
   type: NotificationType;
   severity: NotificationSeverity;
-  
+
   // Project context
   projectId: string;
   userId: string;
   projectTitle: string;
-  
+
   // Error details
   errorMessage: string;
   errorStack?: string;
   retryCount: number;
-  
+
   // Timestamps
   occurredAt: number;
   notifiedAt?: number;
-  
+
   // Notification status
   status: NotificationStatus;
 }
@@ -40,6 +43,4 @@ export interface AdminNotification {
 /**
  * Admin notification data for creation
  */
-export interface NewAdminNotification
-  extends Omit<AdminNotification, "id"> {}
-
+export interface NewAdminNotification extends Omit<AdminNotification, "id"> {}

@@ -66,7 +66,8 @@ export async function saveDeliveryLog(
   stats: DeliveryStats,
   searchResultIds: string[],
   researchStartedAt: number,
-  researchCompletedAt: number
+  researchCompletedAt: number,
+  status: "pending" | "success" | "failed" | "partial" = "success"
 ): Promise<string> {
   const deliveryLogsCollection = db
     .collection("users")
@@ -104,16 +105,17 @@ export async function saveDeliveryLog(
   const deliveryLogData: NewDeliveryLog = {
     projectId,
     userId,
-    // For now, mark as pending delivery - actual delivery will be implemented later
+    // Delivery destination and address
     destination,
     destinationAddress,
     reportMarkdown: report.markdown,
     reportTitle: report.title,
     stats,
-    status: "success", // Research was successful, even if delivery hasn't happened yet
+    status, // Can be "pending" for pre-runs, "success" for immediate delivery
     retryCount: 0,
     searchResultIds,
-    deliveredAt: researchCompletedAt, // For now, same as completion time
+    deliveredAt: status === "success" ? researchCompletedAt : undefined,
+    preparedAt: status === "pending" ? researchCompletedAt : undefined,
     researchStartedAt,
     researchCompletedAt,
   };

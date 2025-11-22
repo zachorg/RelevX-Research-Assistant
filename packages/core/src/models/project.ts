@@ -8,7 +8,7 @@ export type Frequency = "daily" | "weekly" | "monthly";
 
 export type ResultsDestination = "email" | "slack" | "sms" | "none";
 
-export type ProjectStatus = "active" | "paused" | "error" | "draft";
+export type ProjectStatus = "active" | "paused" | "error" | "draft" | "running";
 
 export type DateRangePreference =
   | "last_24h"
@@ -70,7 +70,7 @@ export interface Project {
   resultsDestination: ResultsDestination;
 
   // Scheduling configuration
-  deliveryTime: string; // HH:MM format (24-hour), e.g., "09:15", "14:30" - must be in 15-min increments
+  deliveryTime: string; // HH:MM format (24-hour), any minute value, e.g., "09:15", "14:37", "23:42"
   timezone: string; // IANA timezone identifier, e.g., "America/New_York", "Europe/London"
 
   // Search configuration
@@ -87,6 +87,8 @@ export interface Project {
   lastRunAt?: number; // Timestamp of last research execution
   nextRunAt?: number; // Timestamp of next scheduled execution
   lastError?: string; // Error message from last failed execution
+  preparedDeliveryLogId?: string; // ID of pre-run delivery log ready to send
+  researchStartedAt?: number; // Timestamp when current research started (for "running" status)
 
   // Timestamps
   createdAt: number;

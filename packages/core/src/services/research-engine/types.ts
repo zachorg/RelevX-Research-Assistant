@@ -50,6 +50,9 @@ export interface ResearchResult {
     averageScore: number;
   };
 
+  // Delivery
+  deliveryLogId?: string; // ID of the created delivery log (if results were saved)
+
   // Errors
   error?: string;
 

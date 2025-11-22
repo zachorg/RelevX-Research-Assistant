@@ -413,6 +413,7 @@ export async function executeResearchForProject(
     }
 
     // 10.5. Save delivery log (with compiled report)
+    let deliveryLogId: string | undefined;
     if (report && sortedResults.length > 0) {
       console.log("Saving delivery log...");
       const stats: DeliveryStats = {
@@ -425,7 +426,7 @@ export async function executeResearchForProject(
         urlsSuccessful: totalUrlsSuccessful,
       };
 
-      await saveDeliveryLog(
+      deliveryLogId = await saveDeliveryLog(
         userId,
         projectId,
         project,
@@ -484,6 +485,7 @@ export async function executeResearchForProject(
       urlsSuccessful: totalUrlsSuccessful,
       urlsRelevant: allRelevantResults.length,
       report,
+      deliveryLogId,
       startedAt,
       completedAt,
       durationMs: completedAt - startedAt,
