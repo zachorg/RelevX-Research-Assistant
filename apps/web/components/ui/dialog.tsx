@@ -59,25 +59,6 @@ const Dialog = ({ open = false, onOpenChange, children }: DialogProps) => {
   );
 };
 
-const DialogTrigger = React.forwardRef<
-  HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement>
->(({ onClick, ...props }, ref) => {
-  const { onOpenChange } = useDialog();
-
-  return (
-    <button
-      ref={ref}
-      onClick={(e) => {
-        onOpenChange(true);
-        onClick?.(e);
-      }}
-      {...props}
-    />
-  );
-});
-DialogTrigger.displayName = "DialogTrigger";
-
 const DialogPortal = ({ children }: { children: React.ReactNode }) => {
   const { open } = useDialog();
 
@@ -199,7 +180,6 @@ DialogDescription.displayName = "DialogDescription";
 
 export {
   Dialog,
-  DialogTrigger,
   DialogContent,
   DialogHeader,
   DialogFooter,
