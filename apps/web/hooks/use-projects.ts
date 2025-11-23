@@ -71,8 +71,13 @@ export function useProjects(userId: string | undefined): UseProjectsResult {
 
   const updateProject = useCallback(
     async (projectId: string, data: Partial<NewProject>): Promise<boolean> => {
+      if (!userId) {
+        setError("User must be logged in to update a project");
+        return false;
+      }
+
       try {
-        await updateProjectService(projectId, data);
+        await updateProjectService(userId, projectId, data);
         return true;
       } catch (err) {
         const errorMessage =
@@ -81,13 +86,18 @@ export function useProjects(userId: string | undefined): UseProjectsResult {
         return false;
       }
     },
-    []
+    [userId]
   );
 
   const toggleProjectActive = useCallback(
     async (projectId: string, isActive: boolean): Promise<boolean> => {
+      if (!userId) {
+        setError("User must be logged in to toggle project status");
+        return false;
+      }
+
       try {
-        await toggleProjectActiveService(projectId, isActive);
+        await toggleProjectActiveService(userId, projectId, isActive);
         return true;
       } catch (err) {
         const errorMessage =
@@ -98,7 +108,7 @@ export function useProjects(userId: string | undefined): UseProjectsResult {
         return false;
       }
     },
-    []
+    [userId]
   );
 
   return {

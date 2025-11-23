@@ -45,9 +45,9 @@ export function subscribeToProjects(
   userId: string,
   callback: (projects: Project[]) => void
 ): Unsubscribe {
+  // Projects are stored as a subcollection under each user
   const q = query(
-    collection(db, "projects"),
-    where("userId", "==", userId),
+    collection(db, "users", userId, "projects"),
     orderBy("createdAt", "desc")
   );
 
@@ -75,7 +75,11 @@ export async function createProject(
     updatedAt: serverTimestamp(),
   };
 
-  const docRef = await addDoc(collection(db, "projects"), projectData);
+  // Store project in user's subcollection
+  const docRef = await addDoc(
+    collection(db, "users", userId, "projects"),
+    projectData
+  );
 
   return {
     id: docRef.id,
@@ -89,10 +93,11 @@ export async function createProject(
  * Update an existing project
  */
 export async function updateProject(
+  userId: string,
   projectId: string,
   data: Partial<NewProject>
 ): Promise<void> {
-  const projectRef = doc(db, "projects", projectId);
+  const projectRef = doc(db, "users", userId, "projects", projectId);
   await updateDoc(projectRef, {
     ...data,
     updatedAt: serverTimestamp(),
@@ -103,10 +108,11 @@ export async function updateProject(
  * Toggle project active status
  */
 export async function toggleProjectActive(
+  userId: string,
   projectId: string,
   isActive: boolean
 ): Promise<void> {
-  const projectRef = doc(db, "projects", projectId);
+  const projectRef = doc(db, "users", userId, "projects", projectId);
   await updateDoc(projectRef, {
     isActive,
     updatedAt: serverTimestamp(),
