@@ -41,7 +41,7 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project }: ProjectCardProps) {
   const { user } = useAuth();
-  const { toggleProjectActive } = useProjects(user?.uid);
+  const { toggleProjectActive, deleteProject } = useProjects(user?.uid);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
@@ -192,6 +192,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
         project={project}
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
+        onDelete={deleteProject}
       />
 
       {/* Edit Settings Dialog */}

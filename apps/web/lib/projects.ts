@@ -12,6 +12,7 @@ import {
   serverTimestamp,
   doc,
   updateDoc,
+  deleteDoc,
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -117,4 +118,15 @@ export async function toggleProjectActive(
     isActive,
     updatedAt: serverTimestamp(),
   });
+}
+
+/**
+ * Delete a project
+ */
+export async function deleteProject(
+  userId: string,
+  projectId: string
+): Promise<void> {
+  const projectRef = doc(db, "users", userId, "projects", projectId);
+  await deleteDoc(projectRef);
 }

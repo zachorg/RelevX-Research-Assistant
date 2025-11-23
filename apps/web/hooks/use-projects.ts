@@ -9,6 +9,7 @@ import {
   createProject as createProjectService,
   updateProject as updateProjectService,
   toggleProjectActive as toggleProjectActiveService,
+  deleteProject as deleteProjectService,
 } from "@/lib/projects";
 
 interface UseProjectsResult {
@@ -24,6 +25,7 @@ interface UseProjectsResult {
     projectId: string,
     isActive: boolean
   ) => Promise<boolean>;
+  deleteProject: (projectId: string) => Promise<boolean>;
 }
 
 export function useProjects(userId: string | undefined): UseProjectsResult {
@@ -111,6 +113,26 @@ export function useProjects(userId: string | undefined): UseProjectsResult {
     [userId]
   );
 
+  const deleteProject = useCallback(
+    async (projectId: string): Promise<boolean> => {
+      if (!userId) {
+        setError("User must be logged in to delete a project");
+        return false;
+      }
+
+      try {
+        await deleteProjectService(userId, projectId);
+        return true;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to delete project";
+        setError(errorMessage);
+        return false;
+      }
+    },
+    [userId]
+  );
+
   return {
     projects,
     loading,
@@ -118,5 +140,6 @@ export function useProjects(userId: string | undefined): UseProjectsResult {
     createProject,
     updateProject,
     toggleProjectActive,
+    deleteProject,
   };
 }

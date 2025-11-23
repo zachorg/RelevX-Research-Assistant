@@ -17,24 +17,31 @@ interface DeleteProjectDialogProps {
   project: Project;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onDelete: (projectId: string) => Promise<boolean>;
 }
 
 export function DeleteProjectDialog({
   project,
   open,
   onOpenChange,
+  onDelete,
 }: DeleteProjectDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleDelete = async () => {
     setIsDeleting(true);
+    setError(null);
     try {
-      // TODO: Implement delete project functionality
-      // await deleteProject(project.id);
-      console.log("Delete project:", project.id);
-      onOpenChange(false);
+      const success = await onDelete(project.id);
+      if (success) {
+        onOpenChange(false);
+      } else {
+        setError("Failed to delete project. Please try again.");
+      }
     } catch (error) {
       console.error("Failed to delete project:", error);
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsDeleting(false);
     }
@@ -59,6 +66,11 @@ export function DeleteProjectDialog({
             permanently removed.
           </DialogDescription>
         </DialogHeader>
+        {error && (
+          <div className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md">
+            {error}
+          </div>
+        )}
         <DialogFooter>
           <Button
             variant="outline"
