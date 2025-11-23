@@ -56,6 +56,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
   const destinationLabels = {
     email: "Email",
     slack: "Slack",
+    sms: "SMS",
     none: "In-App Only",
   };
 
@@ -73,7 +74,8 @@ export function ProjectCard({ project }: ProjectCardProps) {
   const handleToggleActive = async () => {
     setIsToggling(true);
     try {
-      await toggleProjectActive(project.id, !project.isActive);
+      const newStatus = project.status === "active" ? "paused" : "active";
+      await toggleProjectActive(project.id, newStatus);
     } catch (err) {
       console.error("Failed to toggle project status:", err);
     } finally {
@@ -88,13 +90,13 @@ export function ProjectCard({ project }: ProjectCardProps) {
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                {project.isActive ? (
+                {project.status === "active" ? (
                   <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
                 ) : (
                   <Circle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                 )}
                 <span className="text-xs font-medium text-muted-foreground">
-                  {project.isActive ? "Active" : "Paused"}
+                  {project.status === "active" ? "Active" : "Paused"}
                 </span>
               </div>
               <CardTitle className="text-xl mb-2 line-clamp-2">
@@ -128,7 +130,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
                   }`}
                   onClick={isToggling ? undefined : handleToggleActive}
                 >
-                  {project.isActive ? (
+                  {project.status === "active" ? (
                     <>
                       <Pause className="w-4 h-4" />
                       {isToggling ? "Pausing..." : "Pause"}
@@ -166,6 +168,18 @@ export function ProjectCard({ project }: ProjectCardProps) {
                 {frequencyLabels[project.frequency]}
               </span>
             </div>
+
+            {project.deliveryTime && project.timezone && (
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Time:</span>
+                <span className="font-medium">
+                  {project.deliveryTime}{" "}
+                  {project.timezone.split("/")[1]?.replace(/_/g, " ") ||
+                    project.timezone}
+                </span>
+              </div>
+            )}
 
             <div className="flex items-center gap-2 text-sm">
               {getDestinationIcon()}

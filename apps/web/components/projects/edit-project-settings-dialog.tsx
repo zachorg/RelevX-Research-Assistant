@@ -38,6 +38,12 @@ export function EditProjectSettingsDialog({
   const [frequency, setFrequency] = useState<Frequency>(project.frequency);
   const [resultsDestination, setResultsDestination] =
     useState<ResultsDestination>(project.resultsDestination);
+  const [deliveryTime, setDeliveryTime] = useState(
+    project.deliveryTime || "09:00"
+  );
+  const [timezone, setTimezone] = useState(
+    project.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+  );
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState("");
 
@@ -48,6 +54,10 @@ export function EditProjectSettingsDialog({
       setDescription(project.description);
       setFrequency(project.frequency);
       setResultsDestination(project.resultsDestination);
+      setDeliveryTime(project.deliveryTime || "09:00");
+      setTimezone(
+        project.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+      );
       setError("");
     }
   }, [open, project]);
@@ -74,6 +84,8 @@ export function EditProjectSettingsDialog({
         description: description.trim(),
         frequency,
         resultsDestination,
+        deliveryTime,
+        timezone,
       });
 
       if (success) {
@@ -177,10 +189,62 @@ export function EditProjectSettingsDialog({
               >
                 <option value="email">Email</option>
                 <option value="slack">Slack</option>
+                <option value="sms">SMS</option>
                 <option value="none">In-App Only</option>
               </Select>
               <p className="text-xs text-muted-foreground">
                 Where should we send your research updates?
+              </p>
+            </div>
+
+            {/* Delivery Time */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-deliveryTime">Delivery Time</Label>
+              <Input
+                id="edit-deliveryTime"
+                type="time"
+                value={deliveryTime}
+                onChange={(e) => setDeliveryTime(e.target.value)}
+                disabled={isUpdating}
+              />
+              <p className="text-xs text-muted-foreground">
+                What time should we deliver your research updates?
+              </p>
+            </div>
+
+            {/* Timezone */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-timezone">Timezone</Label>
+              <Select
+                id="edit-timezone"
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                disabled={isUpdating}
+              >
+                <option value="America/New_York">Eastern Time (ET)</option>
+                <option value="America/Chicago">Central Time (CT)</option>
+                <option value="America/Denver">Mountain Time (MT)</option>
+                <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                <option value="America/Anchorage">Alaska Time (AKT)</option>
+                <option value="Pacific/Honolulu">Hawaii Time (HT)</option>
+                <option value="Europe/London">London (GMT/BST)</option>
+                <option value="Europe/Paris">Paris (CET/CEST)</option>
+                <option value="Europe/Berlin">Berlin (CET/CEST)</option>
+                <option value="Asia/Tokyo">Tokyo (JST)</option>
+                <option value="Asia/Shanghai">Shanghai (CST)</option>
+                <option value="Asia/Hong_Kong">Hong Kong (HKT)</option>
+                <option value="Asia/Singapore">Singapore (SGT)</option>
+                <option value="Asia/Dubai">Dubai (GST)</option>
+                <option value="Asia/Kolkata">India (IST)</option>
+                <option value="Australia/Sydney">Sydney (AEDT/AEST)</option>
+                <option value="Australia/Melbourne">
+                  Melbourne (AEDT/AEST)
+                </option>
+                <option value="Pacific/Auckland">Auckland (NZDT/NZST)</option>
+                <option value="UTC">UTC</option>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Select your timezone for accurate scheduling
               </p>
             </div>
 

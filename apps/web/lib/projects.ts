@@ -17,34 +17,23 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-export type Frequency = "daily" | "weekly" | "monthly";
-export type ResultsDestination = "email" | "slack" | "none";
-
-export interface Project {
-  id: string;
-  userId: string;
-  title: string;
-  description: string;
-  frequency: Frequency;
-  resultsDestination: ResultsDestination;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface NewProject {
-  title: string;
-  description: string;
-  frequency: Frequency;
-  resultsDestination: ResultsDestination;
-}
+// Import types from core package
+export type {
+  Project,
+  NewProject,
+  Frequency,
+  ResultsDestination,
+  ProjectStatus,
+  SearchParameters,
+  ProjectSettings,
+} from "core";
 
 /**
  * Subscribe to real-time updates for a user's projects
  */
 export function subscribeToProjects(
   userId: string,
-  callback: (projects: Project[]) => void
+  callback: (projects: any[]) => void
 ): Unsubscribe {
   // Projects are stored as a subcollection under each user
   const q = query(
@@ -53,15 +42,16 @@ export function subscribeToProjects(
   );
 
   return onSnapshot(q, (snapshot) => {
-    const projects: Project[] = [];
+    const projects: any[] = [];
     snapshot.forEach((doc) => {
       const data = doc.data();
       projects.push({
         id: doc.id,
         ...data,
-        createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
-        updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt,
-      } as Project);
+        // Convert timestamps to numbers for consistency with core model
+        createdAt: data.createdAt?.toMillis?.() || data.createdAt || Date.now(),
+        updatedAt: data.updatedAt?.toMillis?.() || data.updatedAt || Date.now(),
+      });
     });
     callback(projects);
   });
@@ -72,14 +62,33 @@ export function subscribeToProjects(
  */
 export async function createProject(
   userId: string,
-  data: NewProject
-): Promise<Project> {
+  data: {
+    title: string;
+    description: string;
+    frequency: string;
+    resultsDestination: string;
+    deliveryTime: string;
+    timezone: string;
+  }
+): Promise<any> {
+  const now = Date.now();
+
   const projectData = {
-    ...data,
     userId,
-    isActive: true,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+    title: data.title,
+    description: data.description,
+    frequency: data.frequency,
+    resultsDestination: data.resultsDestination,
+    deliveryTime: data.deliveryTime,
+    timezone: data.timezone,
+    status: "active",
+    settings: {
+      relevancyThreshold: 70,
+      minResults: 5,
+      maxResults: 20,
+    },
+    createdAt: now,
+    updatedAt: now,
   };
 
   // Store project in user's subcollection
@@ -91,9 +100,7 @@ export async function createProject(
   return {
     id: docRef.id,
     ...projectData,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  } as Project;
+  };
 }
 
 /**
@@ -102,12 +109,12 @@ export async function createProject(
 export async function updateProject(
   userId: string,
   projectId: string,
-  data: Partial<NewProject>
+  data: any
 ): Promise<void> {
   const projectRef = doc(db, "users", userId, "projects", projectId);
   await updateDoc(projectRef, {
     ...data,
-    updatedAt: serverTimestamp(),
+    updatedAt: Date.now(),
   });
 }
 
@@ -117,12 +124,12 @@ export async function updateProject(
 export async function toggleProjectActive(
   userId: string,
   projectId: string,
-  isActive: boolean
+  status: string
 ): Promise<void> {
   const projectRef = doc(db, "users", userId, "projects", projectId);
   await updateDoc(projectRef, {
-    isActive,
-    updatedAt: serverTimestamp(),
+    status,
+    updatedAt: Date.now(),
   });
 }
 

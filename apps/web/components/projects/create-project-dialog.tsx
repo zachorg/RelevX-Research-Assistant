@@ -36,6 +36,10 @@ export function CreateProjectDialog({
   const [frequency, setFrequency] = useState<Frequency>("daily");
   const [resultsDestination, setResultsDestination] =
     useState<ResultsDestination>("email");
+  const [deliveryTime, setDeliveryTime] = useState("09:00");
+  const [timezone, setTimezone] = useState(
+    Intl.DateTimeFormat().resolvedOptions().timeZone
+  );
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState("");
 
@@ -61,6 +65,8 @@ export function CreateProjectDialog({
         description: description.trim(),
         frequency,
         resultsDestination,
+        deliveryTime,
+        timezone,
       });
 
       // Reset form and close dialog
@@ -68,6 +74,8 @@ export function CreateProjectDialog({
       setDescription("");
       setFrequency("daily");
       setResultsDestination("email");
+      setDeliveryTime("09:00");
+      setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
       onOpenChange(false);
     } catch (err) {
       console.error("Failed to create project:", err);
@@ -86,6 +94,8 @@ export function CreateProjectDialog({
         setDescription("");
         setFrequency("daily");
         setResultsDestination("email");
+        setDeliveryTime("09:00");
+        setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
         setError("");
       }
     }
@@ -173,10 +183,62 @@ export function CreateProjectDialog({
               >
                 <option value="email">Email</option>
                 <option value="slack">Slack</option>
+                <option value="sms">SMS</option>
                 <option value="none">In-App Only</option>
               </Select>
               <p className="text-xs text-muted-foreground">
                 Where should we send your research updates?
+              </p>
+            </div>
+
+            {/* Delivery Time */}
+            <div className="space-y-2">
+              <Label htmlFor="deliveryTime">Delivery Time</Label>
+              <Input
+                id="deliveryTime"
+                type="time"
+                value={deliveryTime}
+                onChange={(e) => setDeliveryTime(e.target.value)}
+                disabled={isCreating}
+              />
+              <p className="text-xs text-muted-foreground">
+                What time should we deliver your research updates?
+              </p>
+            </div>
+
+            {/* Timezone */}
+            <div className="space-y-2">
+              <Label htmlFor="timezone">Timezone</Label>
+              <Select
+                id="timezone"
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                disabled={isCreating}
+              >
+                <option value="America/New_York">Eastern Time (ET)</option>
+                <option value="America/Chicago">Central Time (CT)</option>
+                <option value="America/Denver">Mountain Time (MT)</option>
+                <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                <option value="America/Anchorage">Alaska Time (AKT)</option>
+                <option value="Pacific/Honolulu">Hawaii Time (HT)</option>
+                <option value="Europe/London">London (GMT/BST)</option>
+                <option value="Europe/Paris">Paris (CET/CEST)</option>
+                <option value="Europe/Berlin">Berlin (CET/CEST)</option>
+                <option value="Asia/Tokyo">Tokyo (JST)</option>
+                <option value="Asia/Shanghai">Shanghai (CST)</option>
+                <option value="Asia/Hong_Kong">Hong Kong (HKT)</option>
+                <option value="Asia/Singapore">Singapore (SGT)</option>
+                <option value="Asia/Dubai">Dubai (GST)</option>
+                <option value="Asia/Kolkata">India (IST)</option>
+                <option value="Australia/Sydney">Sydney (AEDT/AEST)</option>
+                <option value="Australia/Melbourne">
+                  Melbourne (AEDT/AEST)
+                </option>
+                <option value="Pacific/Auckland">Auckland (NZDT/NZST)</option>
+                <option value="UTC">UTC</option>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Select your timezone for accurate scheduling
               </p>
             </div>
 
