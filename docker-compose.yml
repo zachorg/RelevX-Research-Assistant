@@ -1,0 +1,49 @@
+services:
+  scheduler:
+    build:
+      context: ../../
+      dockerfile: services/scheduler/Dockerfile
+    container_name: relevx-scheduler
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+
+      # Scheduler Configuration
+      - SCHEDULER_ENABLED=true
+      - RUN_ON_STARTUP=true
+      - SCHEDULER_CHECK_WINDOW_MINUTES=15
+      - SCHEDULER_TIMEZONE=UTC
+
+      # Research Configuration
+      - MAX_CONCURRENT_RESEARCH_JOBS=3
+      - RESEARCH_JOB_TIMEOUT_MS=300000
+    volumes:
+      - ./logs:/app/services/scheduler/logs
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Resource limits (adjust based on your server)
+    deploy:
+      resources:
+        limits:
+          memory: 1.8g
+          cpus: "1.0"
+        reservations:
+          memory: 512m
+          cpus: "0.5"
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('healthy')"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

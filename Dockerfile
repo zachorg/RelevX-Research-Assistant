@@ -86,5 +86,5 @@ HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start the scheduler
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/services/scheduler/src/index.js"]
 
