@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { TimePicker } from "@/components/ui/time-picker";
 import { Sparkles } from "lucide-react";
 
 interface CreateProjectDialogProps {
@@ -194,11 +195,9 @@ export function CreateProjectDialog({
             {/* Delivery Time */}
             <div className="space-y-2">
               <Label htmlFor="deliveryTime">Delivery Time</Label>
-              <Input
-                id="deliveryTime"
-                type="time"
+              <TimePicker
                 value={deliveryTime}
-                onChange={(e) => setDeliveryTime(e.target.value)}
+                onChange={setDeliveryTime}
                 disabled={isCreating}
               />
               <p className="text-xs text-muted-foreground">

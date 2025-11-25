@@ -71,6 +71,13 @@ export function ProjectCard({ project }: ProjectCardProps) {
     }
   };
 
+  const formatTime12Hour = (time24: string) => {
+    const [hours, minutes] = time24.split(":").map(Number);
+    const period = hours >= 12 ? "PM" : "AM";
+    const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+    return `${hours12}:${String(minutes).padStart(2, "0")} ${period}`;
+  };
+
   const handleToggleActive = async () => {
     setIsToggling(true);
     try {
@@ -174,7 +181,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
                 <Clock className="w-4 h-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Time:</span>
                 <span className="font-medium">
-                  {project.deliveryTime}{" "}
+                  {formatTime12Hour(project.deliveryTime)}{" "}
                   {project.timezone.split("/")[1]?.replace(/_/g, " ") ||
                     project.timezone}
                 </span>
