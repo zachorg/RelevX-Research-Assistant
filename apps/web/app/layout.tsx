@@ -3,10 +3,13 @@
  */
 
 import type { Metadata } from "next";
+import "./globals.css";
+import { AuthProvider } from "@/contexts/auth-context";
 
 export const metadata: Metadata = {
-  title: "Research Assistant",
-  description: "Set-and-forget research assistant",
+  title: "RelevX - AI-Powered Research Assistant",
+  description:
+    "Set-and-forget research assistant that delivers curated insights straight to your inbox",
 };
 
 export default function RootLayout({
@@ -15,22 +18,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <head>
-        <style>{`
-          body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
-          }
-          #__next {
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-          }
-        `}</style>
-      </head>
-      <body>{children}</body>
+    <html lang="en" className="dark">
+      <body className="antialiased min-h-screen">
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

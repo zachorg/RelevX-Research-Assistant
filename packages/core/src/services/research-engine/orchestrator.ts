@@ -1,95 +1,60 @@
 /**
- * Research Engine service
+ * Research orchestrator
+ * Core logic for executing the research flow
  *
- * Core orchestrator that coordinates the full research flow:
- * 1. Generate search queries (OpenAI)
- * 2. Execute searches (Brave Search)
- * 3. Extract content from URLs
- * 4. Analyze relevancy (OpenAI)
- * 5. Compile report (OpenAI)
- * 6. Save results and update project
- *
- * Includes retry logic and deduplication.
+ * Now uses provider interfaces for LLM and Search providers,
+ * allowing easy switching between OpenAI/Gemini and Brave/ScrapingBee
  */
 
-import { db } from "./firebase";
-import type { Project } from "../models/project";
-import type { SearchResult, NewSearchResult } from "../models/search-result";
+import { db } from "../firebase";
+import type { Project } from "../../models/project";
+import type { SearchResult } from "../../models/search-result";
+import type { ProcessedUrl } from "../../models/search-history";
+import type { DeliveryStats } from "../../models/delivery-log";
 import type {
-  SearchHistory,
-  NewSearchHistory,
-  ProcessedUrl,
-  QueryPerformance,
-} from "../models/search-history";
-import type { NewDeliveryLog, DeliveryStats } from "../models/delivery-log";
-import {
-  generateSearchQueriesWithRetry,
-  analyzeRelevancyWithRetry,
-  compileReportWithRetry,
-  type GeneratedQuery,
-  type ContentToAnalyze,
-  type ResultForReport,
-} from "./openai";
-import {
-  searchMultipleQueries,
-  deduplicateResults,
-  normalizeUrl as normalizeSearchUrl,
-  type BraveSearchResult,
-  type SearchFilters,
-} from "./brave-search";
-import {
-  extractMultipleContents,
-  type ExtractedContent,
-} from "./content-extractor";
-import { calculateNextRunAt, validateFrequency } from "../utils/scheduling";
+  LLMProvider,
+  ContentToAnalyze,
+  ResultForReport,
+} from "../../interfaces/llm-provider";
+import type {
+  SearchProvider,
+  SearchFilters,
+} from "../../interfaces/search-provider";
+import { extractMultipleContents } from "../content-extractor";
+import { calculateNextRunAt, validateFrequency } from "../../utils/scheduling";
+import { getSearchHistory, updateSearchHistory } from "./search-history";
+import { saveSearchResults, saveDeliveryLog } from "./result-storage";
+import type { ResearchOptions, ResearchResult } from "./types";
+
+// Default providers (can be overridden via options)
+let defaultLLMProvider: LLMProvider | null = null;
+let defaultSearchProvider: SearchProvider | null = null;
 
 /**
- * Research execution options
+ * Set default providers for research execution
+ * Call this during initialization to set up default providers
  */
-export interface ResearchOptions {
-  maxIterations?: number; // Max retry iterations (default: 3)
-  minResults?: number; // Min results to find (default: from project.settings)
-  maxResults?: number; // Max results to include (default: from project.settings)
-  relevancyThreshold?: number; // Min score (default: from project.settings)
-  concurrentExtractions?: number; // Parallel extractions (default: 3)
+export function setDefaultProviders(
+  llmProvider: LLMProvider,
+  searchProvider: SearchProvider
+): void {
+  defaultLLMProvider = llmProvider;
+  defaultSearchProvider = searchProvider;
 }
 
 /**
- * Research execution result
+ * Get or create default providers
  */
-export interface ResearchResult {
-  success: boolean;
-  projectId: string;
-
-  // Results
-  relevantResults: SearchResult[];
-  totalResultsAnalyzed: number;
-  iterationsUsed: number;
-
-  // Queries
-  queriesGenerated: string[];
-  queriesExecuted: string[];
-
-  // URLs
-  urlsFetched: number;
-  urlsSuccessful: number;
-  urlsRelevant: number;
-
-  // Report
-  report?: {
-    markdown: string;
-    title: string;
-    summary: string;
-    averageScore: number;
+function getDefaultProviders(): { llm: LLMProvider; search: SearchProvider } {
+  if (!defaultLLMProvider || !defaultSearchProvider) {
+    throw new Error(
+      "Default providers not set. Call setDefaultProviders() or provide providers in options."
+    );
+  }
+  return {
+    llm: defaultLLMProvider,
+    search: defaultSearchProvider,
   };
-
-  // Errors
-  error?: string;
-
-  // Timing
-  startedAt: number;
-  completedAt: number;
-  durationMs: number;
 }
 
 /**
@@ -122,280 +87,6 @@ function calculateDateRange(frequency: "daily" | "weekly" | "monthly"): {
 }
 
 /**
- * Get or create search history for a project
- */
-async function getSearchHistory(
-  userId: string,
-  projectId: string
-): Promise<SearchHistory> {
-  const historyRef = db
-    .collection("users")
-    .doc(userId)
-    .collection("projects")
-    .doc(projectId)
-    .collection("metadata")
-    .doc("searchHistory");
-
-  const historyDoc = await historyRef.get();
-
-  if (historyDoc.exists) {
-    return historyDoc.data() as SearchHistory;
-  }
-
-  // Create new history
-  const newHistory: NewSearchHistory = {
-    projectId,
-    userId,
-    processedUrls: [],
-    urlIndex: {},
-    queryPerformance: [],
-    queryIndex: {},
-    totalUrlsProcessed: 0,
-    totalSearchesExecuted: 0,
-    totalReportsGenerated: 0,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
-
-  await historyRef.set(newHistory);
-  return newHistory as SearchHistory;
-}
-
-/**
- * Update search history with new data
- */
-async function updateSearchHistory(
-  userId: string,
-  projectId: string,
-  newUrls: ProcessedUrl[],
-  queryPerformance: Map<string, { relevant: number; total: number }>
-): Promise<void> {
-  const historyRef = db
-    .collection("users")
-    .doc(userId)
-    .collection("projects")
-    .doc(projectId)
-    .collection("metadata")
-    .doc("searchHistory");
-
-  const history = await getSearchHistory(userId, projectId);
-
-  // Update processed URLs
-  const updatedUrls = [...history.processedUrls];
-  const updatedUrlIndex = { ...history.urlIndex };
-
-  for (const newUrl of newUrls) {
-    const existing = updatedUrls.find(
-      (u) => u.normalizedUrl === newUrl.normalizedUrl
-    );
-
-    if (existing) {
-      existing.timesFound++;
-      existing.lastRelevancyScore = newUrl.lastRelevancyScore;
-      existing.wasIncluded = existing.wasIncluded || newUrl.wasIncluded;
-    } else {
-      updatedUrls.push(newUrl);
-      updatedUrlIndex[newUrl.normalizedUrl] = true;
-    }
-  }
-
-  // Update query performance
-  const updatedQueryPerformance = [...history.queryPerformance];
-  const updatedQueryIndex = { ...history.queryIndex };
-
-  for (const [query, stats] of queryPerformance.entries()) {
-    const existingIdx = updatedQueryIndex[query];
-
-    if (existingIdx !== undefined) {
-      const existing = updatedQueryPerformance[existingIdx];
-      existing.timesUsed++;
-      existing.urlsFound += stats.total;
-      existing.relevantUrlsFound += stats.relevant;
-      existing.lastUsedAt = Date.now();
-
-      const totalRelevant = existing.relevantUrlsFound;
-      const totalFound = existing.urlsFound;
-      existing.successRate =
-        totalFound > 0 ? (totalRelevant / totalFound) * 100 : 0;
-      existing.averageRelevancyScore =
-        totalRelevant > 0 ? existing.averageRelevancyScore : 0;
-    } else {
-      const newPerf: QueryPerformance = {
-        query,
-        timesUsed: 1,
-        urlsFound: stats.total,
-        relevantUrlsFound: stats.relevant,
-        averageRelevancyScore: 0,
-        lastUsedAt: Date.now(),
-        successRate: stats.total > 0 ? (stats.relevant / stats.total) * 100 : 0,
-      };
-      updatedQueryPerformance.push(newPerf);
-      updatedQueryIndex[query] = updatedQueryPerformance.length - 1;
-    }
-  }
-
-  await historyRef.update({
-    processedUrls: updatedUrls,
-    urlIndex: updatedUrlIndex,
-    queryPerformance: updatedQueryPerformance,
-    queryIndex: updatedQueryIndex,
-    totalUrlsProcessed: updatedUrls.length,
-    totalSearchesExecuted:
-      history.totalSearchesExecuted + queryPerformance.size,
-    updatedAt: Date.now(),
-  });
-}
-
-/**
- * Save search results to Firestore
- */
-async function saveSearchResults(
-  userId: string,
-  projectId: string,
-  results: SearchResult[]
-): Promise<string[]> {
-  const resultsCollection = db
-    .collection("users")
-    .doc(userId)
-    .collection("projects")
-    .doc(projectId)
-    .collection("searchResults");
-
-  const resultIds: string[] = [];
-
-  for (const result of results) {
-    const resultData: NewSearchResult = {
-      projectId: result.projectId,
-      userId: result.userId,
-      url: result.url,
-      normalizedUrl: result.normalizedUrl,
-      sourceQuery: result.sourceQuery,
-      searchEngine: result.searchEngine,
-      snippet: result.snippet,
-      fullContent: result.fullContent,
-      relevancyScore: result.relevancyScore,
-      relevancyReason: result.relevancyReason,
-      metadata: result.metadata,
-      fetchedAt: result.fetchedAt,
-      fetchStatus: result.fetchStatus,
-      fetchError: result.fetchError,
-    };
-
-    const docRef = await resultsCollection.add(resultData);
-    resultIds.push(docRef.id);
-  }
-
-  return resultIds;
-}
-
-/**
- * Save delivery log to Firestore
- */
-async function saveDeliveryLog(
-  userId: string,
-  projectId: string,
-  project: Project,
-  report: {
-    markdown: string;
-    title: string;
-    summary: string;
-    averageScore: number;
-  },
-  stats: DeliveryStats,
-  searchResultIds: string[],
-  researchStartedAt: number,
-  researchCompletedAt: number
-): Promise<string> {
-  const deliveryLogsCollection = db
-    .collection("users")
-    .doc(userId)
-    .collection("projects")
-    .doc(projectId)
-    .collection("deliveryLogs");
-
-  // Determine destination and address based on project configuration
-  let destination: "email" | "slack" | "sms" = "email"; // Default
-  let destinationAddress = "pending";
-
-  if (project.resultsDestination !== "none" && project.deliveryConfig) {
-    if (
-      project.resultsDestination === "email" &&
-      project.deliveryConfig.email
-    ) {
-      destination = "email";
-      destinationAddress = project.deliveryConfig.email.address;
-    } else if (
-      project.resultsDestination === "slack" &&
-      project.deliveryConfig.slack
-    ) {
-      destination = "slack";
-      destinationAddress = project.deliveryConfig.slack.webhookUrl;
-    } else if (
-      project.resultsDestination === "sms" &&
-      project.deliveryConfig.sms
-    ) {
-      destination = "sms";
-      destinationAddress = project.deliveryConfig.sms.phoneNumber;
-    }
-  }
-
-  const deliveryLogData: NewDeliveryLog = {
-    projectId,
-    userId,
-    // For now, mark as pending delivery - actual delivery will be implemented later
-    destination,
-    destinationAddress,
-    reportMarkdown: report.markdown,
-    reportTitle: report.title,
-    stats,
-    status: "success", // Research was successful, even if delivery hasn't happened yet
-    retryCount: 0,
-    searchResultIds,
-    deliveredAt: researchCompletedAt, // For now, same as completion time
-    researchStartedAt,
-    researchCompletedAt,
-  };
-
-  const docRef = await deliveryLogsCollection.add(deliveryLogData);
-  return docRef.id;
-}
-
-/**
- * Execute research for a project
- */
-export async function executeResearch(
-  projectId: string,
-  options?: ResearchOptions
-): Promise<ResearchResult> {
-  const startedAt = Date.now();
-
-  try {
-    // This function is deprecated - use executeResearchForProject instead
-    // which requires userId parameter for proper data access
-    throw new Error(
-      "executeResearch needs userId parameter - use executeResearchForProject instead"
-    );
-  } catch (error: any) {
-    return {
-      success: false,
-      projectId,
-      relevantResults: [],
-      totalResultsAnalyzed: 0,
-      iterationsUsed: 0,
-      queriesGenerated: [],
-      queriesExecuted: [],
-      urlsFetched: 0,
-      urlsSuccessful: 0,
-      urlsRelevant: 0,
-      error: error.message,
-      startedAt,
-      completedAt: Date.now(),
-      durationMs: Date.now() - startedAt,
-    };
-  }
-}
-
-/**
  * Execute research with full context (main implementation)
  */
 export async function executeResearchForProject(
@@ -405,6 +96,11 @@ export async function executeResearchForProject(
 ): Promise<ResearchResult> {
   const startedAt = Date.now();
   const maxIterations = options?.maxIterations || 3;
+
+  // Get providers (use injected or defaults)
+  const defaults = getDefaultProviders();
+  const llmProvider = options?.llmProvider || defaults.llm;
+  const searchProvider = options?.searchProvider || defaults.search;
 
   try {
     // 1. Load project
@@ -476,11 +172,15 @@ export async function executeResearchForProject(
 
       // 7.1 Generate search queries
       console.log("Generating search queries...");
-      const generatedQueries = await generateSearchQueriesWithRetry(
+      const generatedQueries = await llmProvider.generateSearchQueries(
         project.description,
-        project.searchParameters,
-        history.queryPerformance,
-        iteration
+        undefined, // additionalContext
+        {
+          count: 7,
+          focusRecent:
+            project.searchParameters?.dateRangePreference === "last_24h" ||
+            project.searchParameters?.dateRangePreference === "last_week",
+        }
       );
 
       const queries = generatedQueries.map((q) => q.query);
@@ -489,7 +189,7 @@ export async function executeResearchForProject(
 
       // 7.2 Execute searches
       console.log("Executing searches...");
-      const searchResponses = await searchMultipleQueries(
+      const searchResponses = await searchProvider.searchMultiple(
         queries,
         searchFilters
       );
@@ -497,11 +197,30 @@ export async function executeResearchForProject(
 
       // 7.3 Deduplicate results
       console.log("Deduplicating results...");
-      const allBraveResults = Array.from(searchResponses.values());
-      const uniqueResults = deduplicateResults(
-        allBraveResults,
-        processedUrlsSet
+      const allSearchResponses = Array.from(searchResponses.values());
+
+      // Convert generic search results to URLs for deduplication
+      const allUrlsWithMeta = allSearchResponses.flatMap((response) =>
+        response.results.map((result) => ({
+          url: result.url,
+          title: result.title,
+          description: result.description,
+          publishedDate: result.publishedDate,
+        }))
       );
+
+      // Simple deduplication by URL
+      const uniqueUrlsMap = new Map<string, (typeof allUrlsWithMeta)[0]>();
+      for (const item of allUrlsWithMeta) {
+        const normalizedUrl = item.url.toLowerCase().replace(/\/$/, "");
+        if (
+          !processedUrlsSet.has(normalizedUrl) &&
+          !uniqueUrlsMap.has(normalizedUrl)
+        ) {
+          uniqueUrlsMap.set(normalizedUrl, item);
+        }
+      }
+      const uniqueResults = Array.from(uniqueUrlsMap.values());
 
       console.log(
         `Found ${uniqueResults.length} unique URLs (after deduplication)`
@@ -548,11 +267,13 @@ export async function executeResearchForProject(
         })
       );
 
-      const relevancyResults = await analyzeRelevancyWithRetry(
-        contentsToAnalyze,
+      const relevancyResults = await llmProvider.analyzeRelevancy(
         project.description,
-        project.searchParameters,
-        relevancyThreshold
+        contentsToAnalyze,
+        {
+          threshold: relevancyThreshold,
+          batchSize: 10,
+        }
       );
 
       // 7.6 Filter and create SearchResult objects
@@ -586,7 +307,7 @@ export async function executeResearchForProject(
           url: extractedContent.url,
           normalizedUrl: extractedContent.normalizedUrl,
           sourceQuery,
-          searchEngine: "brave",
+          searchEngine: searchProvider.getName().toLowerCase(),
           snippet: extractedContent.snippet,
           fullContent: extractedContent.fullContent,
           relevancyScore: relevancyResult.score,
@@ -663,11 +384,13 @@ export async function executeResearchForProject(
         imageAlt: r.metadata.imageAlt,
       }));
 
-      const compiledReport = await compileReportWithRetry(
-        resultsForReport,
-        project.title,
+      const compiledReport = await llmProvider.compileReport(
         project.description,
-        project.searchParameters
+        resultsForReport,
+        {
+          tone: "professional",
+          maxLength: 5000,
+        }
       );
 
       report = {
@@ -690,6 +413,7 @@ export async function executeResearchForProject(
     }
 
     // 10.5. Save delivery log (with compiled report)
+    let deliveryLogId: string | undefined;
     if (report && sortedResults.length > 0) {
       console.log("Saving delivery log...");
       const stats: DeliveryStats = {
@@ -702,7 +426,7 @@ export async function executeResearchForProject(
         urlsSuccessful: totalUrlsSuccessful,
       };
 
-      await saveDeliveryLog(
+      deliveryLogId = await saveDeliveryLog(
         userId,
         projectId,
         project,
@@ -761,6 +485,7 @@ export async function executeResearchForProject(
       urlsSuccessful: totalUrlsSuccessful,
       urlsRelevant: allRelevantResults.length,
       report,
+      deliveryLogId,
       startedAt,
       completedAt,
       durationMs: completedAt - startedAt,

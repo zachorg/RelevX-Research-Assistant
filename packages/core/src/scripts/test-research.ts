@@ -18,9 +18,12 @@ import * as dotenv from "dotenv";
 import * as path from "path";
 dotenv.config({ path: path.resolve(__dirname, "../../.env"), override: true });
 
-import { executeResearchForProject } from "../services/research-engine";
-import { initializeOpenAI } from "../services/openai";
-import { initializeBraveSearch } from "../services/brave-search";
+import {
+  executeResearchForProject,
+  setDefaultProviders,
+} from "../services/research-engine";
+import { createOpenAIProvider } from "../services/llm";
+import { createBraveSearchProvider } from "../services/search";
 
 async function testMockResearch() {
   console.log("\n=== Testing Research Flow (Mock Mode) ===\n");
@@ -223,10 +226,11 @@ async function main() {
       process.exit(1);
     }
 
-    // Initialize services
-    console.log("\n✓ Initializing services...");
-    initializeOpenAI(openaiKey);
-    initializeBraveSearch(braveKey);
+    // Initialize providers
+    console.log("\n✓ Initializing providers...");
+    const llmProvider = createOpenAIProvider(openaiKey);
+    const searchProvider = createBraveSearchProvider(braveKey);
+    setDefaultProviders(llmProvider, searchProvider);
 
     try {
       await testMockResearch();
@@ -269,10 +273,11 @@ async function main() {
     process.exit(1);
   }
 
-  // Initialize services
-  console.log("\n✓ Initializing services...");
-  initializeOpenAI(openaiKey);
-  initializeBraveSearch(braveKey);
+  // Initialize providers
+  console.log("\n✓ Initializing providers...");
+  const llmProvider = createOpenAIProvider(openaiKey);
+  const searchProvider = createBraveSearchProvider(braveKey);
+  setDefaultProviders(llmProvider, searchProvider);
 
   try {
     await testFullResearch(userId, projectId);

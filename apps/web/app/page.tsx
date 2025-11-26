@@ -1,287 +1,303 @@
 "use client";
 
-/**
- * Main page for web app
- *
- * Shows authentication state and project management UI.
- */
-
-import React, { useState } from "react";
-import { View, StyleSheet, ActivityIndicator } from "react-native";
-import { Screen, Text, Button, Input, Picker } from "ui";
-import { useAuth, useProjects, signInWithGoogle, signOut } from "core";
-import type { Frequency, ResultsDestination } from "core";
+import React from "react";
+import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/auth-context";
+import { useRouter } from "next/navigation";
+import { signInWithGoogle } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Navbar } from "@/components/navigation/navbar";
+import {
+  Sparkles,
+  Clock,
+  Mail,
+  Search,
+  Brain,
+  Zap,
+  ArrowRight,
+} from "lucide-react";
 
 export default function HomePage() {
-  const { user, loading: authLoading } = useAuth();
-  const {
-    projects,
-    loading: projectsLoading,
-    createProject,
-  } = useProjects(user?.uid);
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [frequency, setFrequency] = useState<Frequency>("daily");
-  const [resultsDestination, setResultsDestination] =
-    useState<ResultsDestination>("email");
-  const [isCreating, setIsCreating] = useState(false);
+  React.useEffect(() => {
+    if (user && !loading) {
+      router.push("/projects");
+    }
+  }, [user, loading, router]);
 
   const handleSignIn = async () => {
     try {
       await signInWithGoogle();
     } catch (error) {
       console.error("Sign in failed:", error);
-      alert("Failed to sign in with Google");
     }
   };
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error("Sign out failed:", error);
-    }
-  };
+  const features = [
+    {
+      icon: Brain,
+      title: "AI-Powered Research",
+      description:
+        "Advanced AI analyzes and curates the most relevant information for your topics",
+    },
+    {
+      icon: Clock,
+      title: "Set and Forget",
+      description:
+        "Schedule recurring research updates - daily, weekly, or monthly",
+    },
+    {
+      icon: Search,
+      title: "Smart Search",
+      description:
+        "Automatically searches across multiple sources to find the best content",
+    },
+    {
+      icon: Mail,
+      title: "Delivered to You",
+      description:
+        "Get curated insights delivered straight to your inbox or Slack",
+    },
+    {
+      icon: Zap,
+      title: "Lightning Fast",
+      description:
+        "Instant results powered by cutting-edge search and AI technology",
+    },
+    {
+      icon: Sparkles,
+      title: "Always Fresh",
+      description: "Stay up-to-date with the latest information in your field",
+    },
+  ];
 
-  const handleCreateProject = async () => {
-    if (!title.trim() || !description.trim()) {
-      alert("Please fill in title and description");
-      return;
-    }
-
-    setIsCreating(true);
-    try {
-      await createProject({
-        title: title.trim(),
-        description: description.trim(),
-        frequency,
-        resultsDestination,
-      });
-
-      // Clear form
-      setTitle("");
-      setDescription("");
-      setFrequency("daily");
-      setResultsDestination("email");
-    } catch (error) {
-      console.error("Failed to create project:", error);
-      alert("Failed to create project");
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
-  // Loading state
-  if (authLoading) {
+  if (loading) {
     return (
-      <Screen>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
-      </Screen>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
     );
   }
 
-  // Not authenticated
-  if (!user) {
-    return (
-      <Screen>
-        <View style={styles.centerContainer}>
-          <Text variant="title">Research Assistant</Text>
-          <Text style={styles.subtitle}>
-            Set up recurring research projects and get results delivered to you
-          </Text>
-          <Button
-            title="Sign in with Google"
-            onPress={handleSignIn}
-            style={styles.signInButton}
-          />
-        </View>
-      </Screen>
-    );
-  }
-
-  // Authenticated
   return (
-    <Screen scrollable>
-      <View style={styles.header}>
-        <Text variant="title">Research Assistant</Text>
-        <Button
-          title="Sign Out"
-          onPress={handleSignOut}
-          variant="secondary"
-          style={styles.signOutButton}
-        />
-      </View>
+    <div className="min-h-screen bg-gradient-to-b from-background to-background/80">
+      <Navbar />
 
-      <Text style={styles.welcomeText}>
-        Welcome, {user.displayName || user.email}!
-      </Text>
+      {/* Hero Section */}
+      <section className="container-wide py-20 md:py-32">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center max-w-4xl mx-auto"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border/50 bg-muted/30 mb-8"
+          >
+            <Sparkles className="w-4 h-4 text-purple-500" />
+            <span className="text-sm font-medium">
+              AI-Powered Research Assistant
+            </span>
+          </motion.div>
 
-      {/* New Project Form */}
-      <View style={styles.formSection}>
-        <Text variant="title" style={styles.sectionTitle}>
-          Create New Project
-        </Text>
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="text-5xl md:text-7xl font-bold tracking-tight mb-6"
+          >
+            Stay Informed, <span className="gradient-text">Effortlessly</span>
+          </motion.h1>
 
-        <Input
-          label="Project Title"
-          value={title}
-          onChangeText={setTitle}
-          placeholder="e.g., AI Research Updates"
-        />
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="text-xl text-muted-foreground mb-12 max-w-2xl mx-auto"
+          >
+            Set up recurring research projects and get AI-curated insights
+            delivered straight to your inbox. Never miss important updates in
+            your field again.
+          </motion.p>
 
-        <Input
-          label="What to search for"
-          value={description}
-          onChangeText={setDescription}
-          placeholder="e.g., Latest developments in AI and machine learning"
-          multiline
-          numberOfLines={3}
-        />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+          >
+            <Button
+              onClick={handleSignIn}
+              size="lg"
+              className="gap-2 text-lg px-8"
+            >
+              Get Started Free
+              <ArrowRight className="w-5 h-5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="gap-2 text-lg px-8"
+              onClick={() => {
+                document.getElementById("features")?.scrollIntoView({
+                  behavior: "smooth",
+                });
+              }}
+            >
+              Learn More
+            </Button>
+          </motion.div>
+        </motion.div>
+      </section>
 
-        <Picker
-          label="Frequency"
-          value={frequency}
-          onValueChange={setFrequency}
-          options={[
-            { label: "Daily", value: "daily" },
-            { label: "Weekly", value: "weekly" },
-            { label: "Monthly", value: "monthly" },
-          ]}
-        />
+      {/* Features Section */}
+      <section id="features" className="container-wide py-20">
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            Powerful Features for Modern Researchers
+          </h2>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Everything you need to stay on top of your research topics without
+            the manual work.
+          </p>
+        </motion.div>
 
-        <Picker
-          label="Results Destination"
-          value={resultsDestination}
-          onValueChange={setResultsDestination}
-          options={[
-            { label: "Email", value: "email" },
-            { label: "Slack", value: "slack" },
-            { label: "None (view in app)", value: "none" },
-          ]}
-        />
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {features.map((feature, index) => (
+            <motion.div
+              key={feature.title}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+              viewport={{ once: true }}
+            >
+              <Card className="h-full hover:shadow-lg transition-shadow glass-dark">
+                <CardHeader>
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mb-4">
+                    <feature.icon className="w-6 h-6 text-white" />
+                  </div>
+                  <CardTitle className="text-xl mb-2">
+                    {feature.title}
+                  </CardTitle>
+                  <CardDescription className="text-base">
+                    {feature.description}
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      </section>
 
-        <Button
-          title={isCreating ? "Creating..." : "Create Project"}
-          onPress={handleCreateProject}
-          disabled={isCreating}
-          style={styles.createButton}
-        />
-      </View>
+      {/* How It Works Section */}
+      <section className="container-wide py-20">
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Get started in minutes with our simple three-step process
+          </p>
+        </motion.div>
 
-      {/* Projects List */}
-      <View style={styles.projectsSection}>
-        <Text variant="title" style={styles.sectionTitle}>
-          Your Projects
-        </Text>
+        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          {[
+            {
+              step: "01",
+              title: "Create a Project",
+              description:
+                "Define what you want to research and how often you want updates",
+            },
+            {
+              step: "02",
+              title: "AI Does the Work",
+              description:
+                "Our AI searches, analyzes, and curates the most relevant information",
+            },
+            {
+              step: "03",
+              title: "Receive Insights",
+              description:
+                "Get beautifully formatted research reports delivered to your inbox",
+            },
+          ].map((step, index) => (
+            <motion.div
+              key={step.step}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+              viewport={{ once: true }}
+              className="text-center"
+            >
+              <div className="text-5xl font-bold gradient-text mb-4">
+                {step.step}
+              </div>
+              <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
+              <p className="text-muted-foreground">{step.description}</p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
 
-        {projectsLoading ? (
-          <ActivityIndicator size="small" color="#007AFF" />
-        ) : projects.length === 0 ? (
-          <Text style={styles.emptyText}>
-            No projects yet. Create your first one above!
-          </Text>
-        ) : (
-          projects.map((project) => (
-            <View key={project.id} style={styles.projectCard}>
-              <Text style={styles.projectTitle}>{project.title}</Text>
-              <Text style={styles.projectDescription}>
-                {project.description}
-              </Text>
-              <View style={styles.projectMeta}>
-                <Text variant="caption">
-                  Frequency: {project.frequency} | Destination:{" "}
-                  {project.resultsDestination}
-                </Text>
-                <Text variant="caption">
-                  Created: {new Date(project.createdAt).toLocaleDateString()}
-                </Text>
-              </View>
-            </View>
-          ))
-        )}
-      </View>
-    </Screen>
+      {/* CTA Section */}
+      <section className="container-wide py-20">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          viewport={{ once: true }}
+        >
+          <Card className="glass text-center p-12">
+            <CardHeader>
+              <CardTitle className="text-3xl md:text-4xl mb-4">
+                Ready to Transform Your Research?
+              </CardTitle>
+              <CardDescription className="text-lg mb-8 max-w-2xl mx-auto">
+                Join researchers and professionals who save hours every week
+                with automated research.
+              </CardDescription>
+              <div className="flex justify-center">
+                <Button
+                  onClick={handleSignIn}
+                  size="lg"
+                  className="gap-2 text-lg px-8"
+                >
+                  Start Researching Now
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+              </div>
+            </CardHeader>
+          </Card>
+        </motion.div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-border/40 py-8 mt-20">
+        <div className="container-wide text-center text-sm text-muted-foreground">
+          <p>&copy; 2025 RelevX. All rights reserved.</p>
+        </div>
+      </footer>
+    </div>
   );
 }
-
-const styles = StyleSheet.create({
-  centerContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 10,
-  },
-  subtitle: {
-    textAlign: "center",
-    marginVertical: 20,
-    maxWidth: 400,
-  },
-  signInButton: {
-    marginTop: 20,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  signOutButton: {
-    minWidth: 80,
-  },
-  welcomeText: {
-    marginBottom: 30,
-    fontSize: 16,
-    color: "#666666",
-  },
-  formSection: {
-    marginBottom: 40,
-    padding: 20,
-    backgroundColor: "#F9F9F9",
-    borderRadius: 12,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    marginBottom: 20,
-  },
-  createButton: {
-    marginTop: 10,
-  },
-  projectsSection: {
-    marginBottom: 40,
-  },
-  emptyText: {
-    textAlign: "center",
-    color: "#999999",
-    fontStyle: "italic",
-    marginVertical: 20,
-  },
-  projectCard: {
-    padding: 16,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    marginBottom: 12,
-  },
-  projectTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 8,
-    color: "#000000",
-  },
-  projectDescription: {
-    fontSize: 14,
-    color: "#666666",
-    marginBottom: 8,
-  },
-  projectMeta: {
-    marginTop: 8,
-  },
-});

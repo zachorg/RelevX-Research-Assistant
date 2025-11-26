@@ -1,20 +1,18 @@
 /**
- * Brave Search API service
- *
- * Handles web search via Brave Search API with:
- * - Rate limiting (1 request per second)
- * - Query filtering and parameter support
- * - Result deduplication
- * - Error handling and retries
+ * Brave Search API client
+ * Handles API initialization, rate limiting, and core search functionality
  */
 
-// Brave Search API client
+import type { SearchFilters, BraveSearchResponse } from "./types";
+import { buildQueryWithFilters } from "./filters";
+
+// Brave Search API configuration
 let braveApiKey: string | null = null;
 const BRAVE_SEARCH_API_URL = "https://api.search.brave.com/res/v1/web/search";
 
 // Rate limiting state
 let lastRequestTime = 0;
-const MIN_REQUEST_INTERVAL = 2500; // 2.5 seconds between requests
+const MIN_REQUEST_INTERVAL = 1000; // 1 second between requests
 
 /**
  * Initialize Brave Search API
@@ -48,111 +46,6 @@ async function applyRateLimit(): Promise<void> {
   }
 
   lastRequestTime = Date.now();
-}
-
-/**
- * Search filters for customizing queries
- */
-export interface SearchFilters {
-  // Date filtering
-  dateFrom?: string; // ISO date string (YYYY-MM-DD)
-  dateTo?: string; // ISO date string (YYYY-MM-DD)
-
-  // Location/language
-  country?: string; // ISO 3166-1 alpha-2 country code (e.g., "US", "GB")
-  language?: string; // ISO 639-1 language code (e.g., "en", "es")
-
-  // Result configuration
-  count?: number; // Number of results to return (default: 20, max: 20)
-  offset?: number; // Pagination offset
-
-  // Content filtering
-  safesearch?: "off" | "moderate" | "strict"; // Safe search level
-
-  // Site filtering (applied to query string)
-  includeDomains?: string[]; // Domains to prioritize
-  excludeDomains?: string[]; // Domains to exclude
-}
-
-/**
- * Single search result from Brave
- */
-export interface BraveSearchResult {
-  title: string;
-  url: string;
-  description: string;
-  published_date?: string; // ISO date string
-  thumbnail?: {
-    src: string;
-    alt?: string;
-  };
-  language?: string;
-  meta_url?: {
-    hostname: string;
-    path: string;
-  };
-}
-
-/**
- * Brave Search API response
- */
-export interface BraveSearchResponse {
-  query: string;
-  results: BraveSearchResult[];
-  totalResults: number;
-}
-
-/**
- * Normalize URL for deduplication
- * Removes query params, fragments, trailing slashes, and www prefix
- */
-export function normalizeUrl(url: string): string {
-  try {
-    const urlObj = new URL(url);
-
-    // Remove www prefix
-    let hostname = urlObj.hostname.toLowerCase();
-    if (hostname.startsWith("www.")) {
-      hostname = hostname.substring(4);
-    }
-
-    // Remove trailing slash from pathname
-    let pathname = urlObj.pathname;
-    if (pathname.endsWith("/") && pathname.length > 1) {
-      pathname = pathname.slice(0, -1);
-    }
-
-    // Reconstruct without query params and hash
-    return `${urlObj.protocol}//${hostname}${pathname}`;
-  } catch (error) {
-    // If URL parsing fails, return original URL
-    return url.toLowerCase();
-  }
-}
-
-/**
- * Build query string with site filters
- */
-function buildQueryWithFilters(query: string, filters?: SearchFilters): string {
-  let modifiedQuery = query;
-
-  // Add site: operators for included domains
-  if (filters?.includeDomains && filters.includeDomains.length > 0) {
-    const siteFilters = filters.includeDomains
-      .map((domain) => `site:${domain}`)
-      .join(" OR ");
-    modifiedQuery = `${modifiedQuery} (${siteFilters})`;
-  }
-
-  // Add -site: operators for excluded domains
-  if (filters?.excludeDomains && filters.excludeDomains.length > 0) {
-    const excludeFilters = filters.excludeDomains
-      .map((domain) => `-site:${domain}`)
-      .join(" ");
-    modifiedQuery = `${modifiedQuery} ${excludeFilters}`;
-  }
-
-  return modifiedQuery.trim();
 }
 
 /**
@@ -316,28 +209,4 @@ export async function searchMultipleQueries(
   }
 
   return results;
-}
-
-/**
- * Deduplicate search results across multiple responses
- */
-export function deduplicateResults(
-  responses: BraveSearchResponse[],
-  alreadyProcessedUrls?: Set<string>
-): BraveSearchResult[] {
-  const seenUrls = new Set<string>(alreadyProcessedUrls || []);
-  const uniqueResults: BraveSearchResult[] = [];
-
-  for (const response of responses) {
-    for (const result of response.results) {
-      const normalizedUrl = normalizeUrl(result.url);
-
-      if (!seenUrls.has(normalizedUrl)) {
-        seenUrls.add(normalizedUrl);
-        uniqueResults.push(result);
-      }
-    }
-  }
-
-  return uniqueResults;
 }

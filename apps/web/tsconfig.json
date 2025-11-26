@@ -21,7 +21,6 @@
     ],
     "paths": {
       "@/*": ["./*"],
-      "react-native": ["./node_modules/react-native-web"],
       "core": ["../../packages/core/src/index.ts"],
       "core/*": ["../../packages/core/src/*"],
       "ui": ["../../packages/ui/src/index.ts"],

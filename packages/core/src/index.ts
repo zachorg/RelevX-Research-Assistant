@@ -32,6 +32,14 @@ export type {
 } from "./models/delivery-log";
 
 export type {
+  AdminNotification,
+  NewAdminNotification,
+  NotificationType,
+  NotificationSeverity,
+  NotificationStatus,
+} from "./models/admin-notification";
+
+export type {
   SearchHistory,
   NewSearchHistory,
   ProcessedUrl,
@@ -52,37 +60,6 @@ export {
 } from "./services/projects";
 
 export {
-  initializeOpenAI,
-  generateSearchQueries,
-  generateSearchQueriesWithRetry,
-  analyzeRelevancy,
-  analyzeRelevancyWithRetry,
-  compileReport,
-  compileReportWithRetry,
-} from "./services/openai";
-export type {
-  GeneratedQuery,
-  ContentToAnalyze,
-  RelevancyResult,
-  ResultForReport,
-  CompiledReport,
-} from "./services/openai";
-
-export {
-  initializeBraveSearch,
-  searchWeb,
-  searchWithRetry,
-  searchMultipleQueries,
-  deduplicateResults,
-  normalizeUrl,
-} from "./services/brave-search";
-export type {
-  SearchFilters,
-  BraveSearchResult,
-  BraveSearchResponse,
-} from "./services/brave-search";
-
-export {
   extractContent,
   extractContentWithRetry,
   extractMultipleContents,
@@ -94,55 +71,52 @@ export type {
 } from "./services/content-extractor";
 
 export {
-  executeResearch,
   executeResearchForProject,
   executeResearchBatch,
+  setDefaultProviders,
 } from "./services/research-engine";
 export type {
   ResearchResult,
   ResearchOptions,
 } from "./services/research-engine";
 
-// Utils
-export {
-  normalizeUrl as utilNormalizeUrl,
-  isDuplicate,
-  addToProcessed,
-  filterDuplicates,
-  extractDomain,
-  isSameDomain,
-  groupByDomain,
-  calculateUrlSimilarity,
-  createUrlIndex,
-  checkDuplicates,
-} from "./utils/deduplication";
+// Provider Interfaces
+export type {
+  LLMProvider,
+  SearchProvider,
+  GeneratedQuery,
+  SearchFilters,
+  SearchResultItem,
+  SearchResponse,
+} from "./interfaces";
 
+// Provider Implementations
+export { OpenAIProvider, createOpenAIProvider } from "./services/llm";
 export {
-  RateLimiter,
-  Throttle,
-  SimpleRateLimiter,
-  delay,
-  calculateBackoff,
-  executeWithRateLimit,
-  executeBatchWithRateLimit,
-  retryWithBackoff,
-} from "./utils/rate-limiter";
+  BraveSearchProvider,
+  createBraveSearchProvider,
+} from "./services/search";
+
+// Provider Factories
+export {
+  createLLMProvider,
+  createSearchProvider,
+  createProviders,
+} from "./providers";
+export type {
+  LLMProviderType,
+  SearchProviderType,
+  LLMProviderConfig,
+  SearchProviderConfig,
+} from "./providers";
+
+// Utils
+export { normalizeUrl as utilNormalizeUrl } from "./utils/deduplication";
 
 export {
   calculateDateRange,
   calculateDateRangeByFrequency,
   calculateDateRangeByPreference,
-  calculateNextRunTime,
-  isProjectDue,
-  formatDateForQuery,
-  getRelativeTimeDescription,
-  parsePublishedDate,
-  isDateInRange,
-  getTemporalKeywords,
-  formatDateRangeDisplay,
-  getStartOfDay,
-  getEndOfDay,
-  isOlderThan,
 } from "./utils/date-filters";
 export type { DateRange } from "./utils/date-filters";
 
