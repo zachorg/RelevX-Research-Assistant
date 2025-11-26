@@ -2,6 +2,7 @@
 const nextConfig = {
   transpilePackages: ["core"],
 
+  // Webpack configuration (for when not using Turbopack)
   webpack: (config, { isServer }) => {
     // Exclude server-only modules from client bundle
     if (!isServer) {
