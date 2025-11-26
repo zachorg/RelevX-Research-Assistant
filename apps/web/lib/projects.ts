@@ -14,6 +14,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { calculateNextRunAt } from "core/utils";
 
 // Import types from core package
 export type {
@@ -71,6 +72,13 @@ export async function createProject(
 ): Promise<any> {
   const now = Date.now();
 
+  // Calculate next run time based on frequency, delivery time, and timezone
+  const nextRunAt = calculateNextRunAt(
+    data.frequency as any,
+    data.deliveryTime,
+    data.timezone
+  );
+
   const projectData = {
     userId,
     title: data.title,
@@ -80,6 +88,7 @@ export async function createProject(
     deliveryTime: data.deliveryTime,
     timezone: data.timezone,
     status: "active",
+    nextRunAt,
     settings: {
       relevancyThreshold: 70,
       minResults: 5,

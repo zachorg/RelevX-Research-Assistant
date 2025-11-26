@@ -12,6 +12,7 @@ WORKDIR /app
 # Copy workspace and package files
 COPY pnpm-workspace.yaml ./
 COPY package.json pnpm-lock.yaml ./
+COPY tsconfig.base.json ./
 
 # Copy core package
 COPY packages/core/package.json ./packages/core/
@@ -26,7 +27,11 @@ COPY services/scheduler/src ./services/scheduler/src
 # Install dependencies for both packages
 RUN pnpm install --frozen-lockfile
 
-# Build TypeScript (from scheduler directory)
+# Build core package first
+WORKDIR /app/packages/core
+RUN pnpm run build
+
+# Build scheduler package
 WORKDIR /app/services/scheduler
 RUN pnpm run build
 
@@ -56,7 +61,7 @@ RUN pnpm install --frozen-lockfile --prod && \
 
 # Copy built JavaScript from builder stage
 COPY --from=builder /app/services/scheduler/dist ./services/scheduler/dist
-COPY --from=builder /app/packages/core/src ./packages/core/src
+COPY --from=builder /app/packages/core/dist ./packages/core/dist
 
 # Set working directory to scheduler
 WORKDIR /app/services/scheduler

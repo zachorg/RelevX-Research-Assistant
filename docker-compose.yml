@@ -1,15 +1,15 @@
 services:
   scheduler:
     build:
-      context: ../../
-      dockerfile: services/scheduler/Dockerfile
+      context: .
+      dockerfile: Dockerfile
     container_name: relevx-scheduler
     restart: always
     env_file:
       - .env
     environment:
       - NODE_ENV=production
-      - LOG_LEVEL=info
+      - LOG_LEVEL=debug
 
       # Scheduler Configuration
       - SCHEDULER_ENABLED=true
@@ -20,8 +20,6 @@ services:
       # Research Configuration
       - MAX_CONCURRENT_RESEARCH_JOBS=3
       - RESEARCH_JOB_TIMEOUT_MS=300000
-    volumes:
-      - ./logs:/app/services/scheduler/logs
 
     # Logging configuration
     logging:

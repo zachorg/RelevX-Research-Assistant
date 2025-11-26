@@ -2,9 +2,20 @@
   "name": "core",
   "version": "1.0.0",
   "private": true,
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "default": "./dist/utils/index.js"
+    }
+  },
   "scripts": {
+    "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test:openai": "tsx src/scripts/test-openai.ts",
     "test:brave": "tsx src/scripts/test-brave-search.ts",
@@ -16,6 +27,7 @@
     "cheerio": "^1.1.2",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
+    "dotenv": "^16.4.5",
     "firebase": "^10.7.1",
     "firebase-admin": "^12.0.0",
     "openai": "^6.9.0",
@@ -23,7 +35,6 @@
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
-    "dotenv": "^16.4.5",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.2",
     "typescript": "^5.3.0"

@@ -175,8 +175,25 @@ export async function activateProject(
       .doc(userId)
       .collection("projects")
       .doc(projectId);
+
+    // Get current project data to calculate nextRunAt
+    const projectDoc = await projectRef.get();
+    if (!projectDoc.exists) {
+      throw new Error("Project not found");
+    }
+
+    const project = projectDoc.data() as Project;
+
+    // Calculate nextRunAt based on project's frequency, deliveryTime, and timezone
+    const nextRunAt = calculateNextRunAtWithTimezone(
+      project.frequency,
+      project.deliveryTime,
+      project.timezone
+    );
+
     await projectRef.update({
       status: "active",
+      nextRunAt,
       updatedAt: Date.now(),
     });
   } catch (error) {

@@ -114,11 +114,6 @@ async function executeProjectResearch(
       updatedAt: Date.now(),
     });
 
-    // Import result-storage to override status
-    const { saveDeliveryLog } = await import(
-      "core/src/services/research-engine/result-storage"
-    );
-
     // Execute research (this will save with default "success" status)
     // We need to pass the status through the options
     const result = await executeResearchForProject(userId, project.id);
@@ -323,7 +318,7 @@ async function runResearchJob(): Promise<void> {
     });
 
     // Import scheduling utility for retry projects
-    const { calculateNextRunAt } = await import("core/src/utils/scheduling");
+    const { calculateNextRunAt } = await import("core");
 
     // Execute research for each project
     for (const { userId, project, isRetry } of projectsToRun) {
@@ -502,7 +497,7 @@ async function runDeliveryJob(): Promise<void> {
     logger.info(`Delivering results for ${projectsToDeliver.length} projects`);
 
     // Import scheduling utility
-    const { calculateNextRunAt } = await import("core/src/utils/scheduling");
+    const { calculateNextRunAt } = await import("core");
 
     // Update delivery logs and projects
     for (const { userId, project } of projectsToDeliver) {

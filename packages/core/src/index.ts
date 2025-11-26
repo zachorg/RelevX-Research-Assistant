@@ -120,6 +120,17 @@ export {
 } from "./utils/date-filters";
 export type { DateRange } from "./utils/date-filters";
 
+export {
+  calculateNextRunAt,
+  validateFrequency,
+  isProjectDue,
+} from "./utils/scheduling";
+
+export {
+  saveDeliveryLog,
+  saveSearchResults,
+} from "./services/research-engine/result-storage";
+
 // Hooks
 export { useAuth } from "./hooks/useAuth";
 export { useProjects } from "./hooks/useProjects";
