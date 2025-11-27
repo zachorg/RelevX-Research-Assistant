@@ -3,6 +3,7 @@
  */
 
 import { getClient } from "./client";
+import { QUERY_GENERATION_PROMPTS, renderPrompt } from "./prompts";
 import type { SearchParameters } from "../../models/project";
 import type { QueryPerformance } from "../../models/search-history";
 import type { GeneratedQuery } from "./types";
@@ -72,45 +73,30 @@ export async function generateSearchQueries(
       "\n\nThis is retry iteration 3 (final attempt). Generate very broad queries with alternative phrasings.";
   }
 
-  const systemPrompt = `You are a search query optimization expert. Your task is to generate diverse, effective search queries that will find relevant content on the web.
+  // Build additional context string
+  const additionalContext =
+    contextParts.length > 0
+      ? `Additional Context:\n${contextParts.join("\n")}\n`
+      : "";
 
-Generate 5-7 search queries using different strategies:
-1. BROAD queries - general terms that cast a wide net
-2. SPECIFIC queries - precise terms with specific details
-3. QUESTION queries - phrased as questions people might ask
-4. TEMPORAL queries - include recency indicators like "latest", "recent", "2024", "new"
-
-Each query should be distinct and approach the topic from different angles.
-Queries should be concise (3-8 words typically) and use natural search language.`;
-
-  const userPrompt = `Project Description:
-${description}
-
-${
-  contextParts.length > 0
-    ? `Additional Context:\n${contextParts.join("\n")}\n`
-    : ""
-}${queryPerformanceContext}${iterationGuidance}
-
-Generate 5-7 diverse search queries. Return ONLY a JSON object with this structure:
-{
-  "queries": [
-    {
-      "query": "the search query text",
-      "type": "broad|specific|question|temporal",
-      "reasoning": "brief explanation of strategy"
-    }
-  ]
-}`;
+  // Render user prompt with template variables
+  const userPrompt = renderPrompt(QUERY_GENERATION_PROMPTS.user, {
+    description,
+    additionalContext,
+    queryPerformanceContext: queryPerformanceContext || "",
+    iterationGuidance: iterationGuidance || "",
+  });
 
   try {
     const response = await client.chat.completions.create({
-      model: "gpt-5-nano",
+      model: QUERY_GENERATION_PROMPTS.model,
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: QUERY_GENERATION_PROMPTS.system },
         { role: "user", content: userPrompt },
       ],
-      response_format: { type: "json_object" },
+      response_format: {
+        type: QUERY_GENERATION_PROMPTS.responseFormat || "json_object",
+      },
     });
 
     const content = response.choices[0].message.content;

@@ -3,6 +3,7 @@
  */
 
 import { getClient } from "./client";
+import { REPORT_COMPILATION_PROMPTS, renderPrompt } from "./prompts";
 import type { SearchParameters } from "../../models/project";
 import type { ResultForReport, CompiledReport } from "./types";
 
@@ -47,47 +48,24 @@ ${r.snippet}
     )
     .join("\n");
 
-  const systemPrompt = `You are a research report compiler. Your task is to create a comprehensive, well-structured markdown report from research findings.
-
-The report should:
-1. Have a clear executive summary at the top
-2. Be organized into logical sections by topic/theme
-3. Include all relevant results with proper citations
-4. Use markdown formatting (headers, lists, bold, links, images)
-5. Include images where available
-6. Provide context and analysis, not just list results
-7. Be professional and easy to read
-
-Use markdown features:
-- # for main title, ## for sections, ### for subsections
-- **bold** for emphasis
-- [link text](url) for citations
-- ![alt text](image-url) for images
-- Bullet points for lists
-- > for important quotes or highlights`;
-
-  const userPrompt = `Project: ${projectTitle}
-Description: ${projectDescription}
-
-Create a comprehensive markdown report from these ${results.length} research findings:
-
-${resultsFormatted}
-
-Return ONLY a JSON object with this structure:
-{
-  "markdown": "the full markdown report",
-  "title": "report title",
-  "summary": "2-3 sentence executive summary"
-}`;
+  // Render user prompt with template variables
+  const userPrompt = renderPrompt(REPORT_COMPILATION_PROMPTS.user, {
+    projectTitle,
+    projectDescription,
+    resultCount: results.length,
+    resultsFormatted,
+  });
 
   try {
     const response = await client.chat.completions.create({
-      model: "gpt-4.1-mini", // Use better model for final report
+      model: REPORT_COMPILATION_PROMPTS.model,
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: REPORT_COMPILATION_PROMPTS.system },
         { role: "user", content: userPrompt },
       ],
-      response_format: { type: "json_object" },
+      response_format: {
+        type: REPORT_COMPILATION_PROMPTS.responseFormat || "json_object",
+      },
     });
 
     const content = response.choices[0].message.content;

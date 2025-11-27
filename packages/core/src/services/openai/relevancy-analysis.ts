@@ -3,6 +3,7 @@
  */
 
 import { getClient } from "./client";
+import { RELEVANCY_ANALYSIS_PROMPTS, renderPrompt } from "./prompts";
 import type { SearchParameters } from "../../models/project";
 import type { ContentToAnalyze, RelevancyResult } from "./types";
 
@@ -32,20 +33,6 @@ export async function analyzeRelevancy(
     );
   }
 
-  const systemPrompt = `You are a content relevancy analyst. Your task is to analyze web content and determine how relevant it is to a user's research project.
-
-For each piece of content, provide:
-1. A relevancy score (0-100) where:
-   - 90-100: Highly relevant, directly addresses the topic
-   - 70-89: Very relevant, covers important aspects
-   - 50-69: Moderately relevant, tangentially related
-   - 30-49: Slightly relevant, mentions the topic
-   - 0-29: Not relevant or off-topic
-
-2. Clear reasoning explaining the score
-3. Key relevant points found in the content
-4. Whether it meets the minimum threshold for inclusion`;
-
   const contentsFormatted = contents
     .map(
       (c, idx) => `
@@ -59,36 +46,30 @@ ${c.snippet}
     )
     .join("\n");
 
-  const userPrompt = `Project Description:
-${projectDescription}
+  // Build requirements string
+  const requirements =
+    contextParts.length > 0
+      ? `Requirements:\n${contextParts.join("\n")}\n`
+      : "";
 
-${contextParts.length > 0 ? `Requirements:\n${contextParts.join("\n")}\n` : ""}
-Minimum Relevancy Threshold: ${threshold}
-
-Content to Analyze:
-${contentsFormatted}
-
-Analyze each piece of content and return ONLY a JSON object with this structure:
-{
-  "results": [
-    {
-      "url": "the content URL",
-      "score": 0-100,
-      "reasoning": "explanation of the score",
-      "keyPoints": ["point 1", "point 2", "point 3"],
-      "isRelevant": true or false (based on threshold)
-    }
-  ]
-}`;
+  // Render user prompt with template variables
+  const userPrompt = renderPrompt(RELEVANCY_ANALYSIS_PROMPTS.user, {
+    projectDescription,
+    requirements,
+    threshold,
+    contentsFormatted,
+  });
 
   try {
     const response = await client.chat.completions.create({
-      model: "gpt-5-nano", // Use cheaper model for analysis
+      model: RELEVANCY_ANALYSIS_PROMPTS.model,
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: RELEVANCY_ANALYSIS_PROMPTS.system },
         { role: "user", content: userPrompt },
       ],
-      response_format: { type: "json_object" },
+      response_format: {
+        type: RELEVANCY_ANALYSIS_PROMPTS.responseFormat || "json_object",
+      },
     });
 
     const content = response.choices[0].message.content;
