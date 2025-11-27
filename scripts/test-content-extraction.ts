@@ -2,7 +2,7 @@
  * Test script for content extraction service
  *
  * Usage:
- *   ts-node packages/core/src/scripts/test-content-extraction.ts
+ *   ts-node scripts/test-content-extraction.ts
  *
  * No environment variables required (uses public URLs)
  */
@@ -10,14 +10,14 @@
 // Load environment variables from .env file (optional for this test)
 import * as dotenv from "dotenv";
 import * as path from "path";
-dotenv.config({ path: path.resolve(__dirname, "../../.env"), override: true });
+dotenv.config({ path: path.resolve(__dirname, "../.env"), override: true });
 
 import {
   extractContent,
   extractMultipleContents,
   getContentPreview,
   type ExtractionOptions,
-} from "../services/content-extractor";
+} from "../packages/core/src/services/content-extractor";
 
 async function testSingleExtraction() {
   console.log("\n=== Testing Single URL Extraction ===\n");

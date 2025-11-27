@@ -2,10 +2,10 @@
  * Test script for full research flow
  *
  * Usage:
- *   ts-node packages/core/src/scripts/test-research.ts [projectId] [userId]
+ *   ts-node scripts/test-research.ts [projectId] [userId]
  *
  * Or for a quick test with mock data:
- *   ts-node packages/core/src/scripts/test-research.ts --mock
+ *   ts-node scripts/test-research.ts --mock
  *
  * Environment variables required:
  *   OPENAI_API_KEY
@@ -16,14 +16,14 @@
 // Load environment variables from .env file
 import * as dotenv from "dotenv";
 import * as path from "path";
-dotenv.config({ path: path.resolve(__dirname, "../../.env"), override: true });
+dotenv.config({ path: path.resolve(__dirname, "../.env"), override: true });
 
 import {
   executeResearchForProject,
   setDefaultProviders,
-} from "../services/research-engine";
-import { createOpenAIProvider } from "../services/llm";
-import { createBraveSearchProvider } from "../services/search";
+} from "../packages/core/src/services/research-engine";
+import { createOpenAIProvider } from "../packages/core/src/services/llm";
+import { createBraveSearchProvider } from "../packages/core/src/services/search";
 
 async function testMockResearch() {
   console.log("\n=== Testing Research Flow (Mock Mode) ===\n");
@@ -31,7 +31,7 @@ async function testMockResearch() {
 
   // Test 1: Query Generation
   console.log("1. Testing Query Generation...");
-  const { generateSearchQueriesWithRetry } = await import("../services/openai");
+  const { generateSearchQueriesWithRetry } = await import("../packages/core/src/services/openai");
 
   const queries = await generateSearchQueriesWithRetry(
     "Latest developments in web development frameworks and best practices",
@@ -45,7 +45,7 @@ async function testMockResearch() {
 
   // Test 2: Search Execution
   console.log("2. Testing Search Execution...");
-  const { searchMultipleQueries } = await import("../services/brave-search");
+  const { searchMultipleQueries } = await import("../packages/core/src/services/brave-search");
 
   const searchResults = await searchMultipleQueries(
     queries.slice(0, 2).map((q) => q.query),
@@ -61,7 +61,7 @@ async function testMockResearch() {
   // Test 3: Content Extraction
   console.log("3. Testing Content Extraction...");
   const { extractMultipleContents } = await import(
-    "../services/content-extractor"
+    "../packages/core/src/services/content-extractor"
   );
 
   const urls: string[] = [];
@@ -84,7 +84,7 @@ async function testMockResearch() {
 
   // Test 4: Relevancy Analysis
   console.log("4. Testing Relevancy Analysis...");
-  const { analyzeRelevancyWithRetry } = await import("../services/openai");
+  const { analyzeRelevancyWithRetry } = await import("../packages/core/src/services/openai");
 
   const contentsToAnalyze = successfulExtractions.map((c) => ({
     url: c.url,
@@ -106,7 +106,7 @@ async function testMockResearch() {
   // Test 5: Report Compilation
   if (relevantResults.length > 0) {
     console.log("5. Testing Report Compilation...");
-    const { compileReportWithRetry } = await import("../services/openai");
+    const { compileReportWithRetry } = await import("../packages/core/src/services/openai");
 
     const resultsForReport = relevantResults.map((r) => ({
       url: r.url,

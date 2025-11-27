@@ -2,7 +2,7 @@
  * Test script for OpenAI service
  *
  * Usage:
- *   ts-node packages/core/src/scripts/test-openai.ts
+ *   ts-node scripts/test-openai.ts
  *
  * Environment variables required:
  *   OPENAI_API_KEY
@@ -11,7 +11,7 @@
 // Load environment variables from .env file
 import * as dotenv from "dotenv";
 import * as path from "path";
-dotenv.config({ path: path.resolve(__dirname, "../../.env"), override: true });
+dotenv.config({ path: path.resolve(__dirname, "../.env"), override: true });
 
 import {
   initializeOpenAI,
@@ -20,7 +20,7 @@ import {
   compileReport,
   type ContentToAnalyze,
   type ResultForReport,
-} from "../services/openai";
+} from "../packages/core/src/services/openai";
 
 async function testQueryGeneration() {
   console.log("\n=== Testing Query Generation ===\n");

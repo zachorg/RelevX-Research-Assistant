@@ -2,7 +2,7 @@
  * Test script for Brave Search API service
  *
  * Usage:
- *   ts-node packages/core/src/scripts/test-brave-search.ts
+ *   ts-node scripts/test-brave-search.ts
  *
  * Environment variables required:
  *   BRAVE_SEARCH_API_KEY
@@ -11,7 +11,7 @@
 // Load environment variables from .env file
 import * as dotenv from "dotenv";
 import * as path from "path";
-dotenv.config({ path: path.resolve(__dirname, "../../.env"), override: true });
+dotenv.config({ path: path.resolve(__dirname, "../.env"), override: true });
 
 import {
   initializeBraveSearch,
@@ -20,7 +20,7 @@ import {
   deduplicateResults,
   normalizeUrl,
   type SearchFilters,
-} from "../services/brave-search";
+} from "../packages/core/src/services/brave-search";
 
 async function testSingleSearch() {
   console.log("\n=== Testing Single Search ===\n");

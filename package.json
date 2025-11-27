@@ -1,5 +1,5 @@
 {
-  "name": "Research Assistant",
+  "name": "research-assistant",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -7,10 +7,19 @@
     "dev:mobile": "cd apps/mobile && pnpm start",
     "build:web": "cd apps/web && pnpm build",
     "clean": "pnpm -r exec rm -rf node_modules && rm -rf node_modules",
-    "install:all": "pnpm install"
+    "install:all": "pnpm install",
+    "test:openai": "tsx scripts/test-openai.ts",
+    "test:brave": "tsx scripts/test-brave-search.ts",
+    "test:extract": "tsx scripts/test-content-extraction.ts",
+    "test:research": "tsx scripts/test-research.ts",
+    "test:email": "tsx scripts/test-email.ts"
   },
   "packageManager": "pnpm@8.15.0",
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.5",
+    "tsx": "^4.19.2"
   }
 }
