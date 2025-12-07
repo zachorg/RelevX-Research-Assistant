@@ -8,13 +8,10 @@ import { useProjects } from "@/hooks/use-projects";
 import { Button } from "@/components/ui/button";
 import { ProjectCard } from "@/components/projects/project-card";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
-import { usePlans } from "@/hooks/use-plans";
-import { toast } from "react-toastify";
 
 export default function ProjectsPage() {
   const { user, userProfile } = useAuth();
   const { projects, loading } = useProjects(user?.uid);
-  const { plans, loading: plansLoading } = usePlans();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   // Sort projects: active projects first, then paused projects
