@@ -37,17 +37,27 @@ export function Navbar() {
     <nav className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container-wide flex h-16 items-center justify-between">
         {/* Logo / Brand */}
-        <Link
-          href={user ? "/projects" : "/"}
-          className="flex items-center gap-2 group"
-        >
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-xl font-bold gradient-text group-hover:opacity-80 transition-opacity">
-            RelevX
-          </span>
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link
+            href={user ? "/projects" : "/"}
+            className="flex items-center gap-2 group"
+          >
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-xl font-bold gradient-text group-hover:opacity-80 transition-opacity">
+              RelevX
+            </span>
+          </Link>
+
+          <Button 
+            variant="ghost" 
+            asChild 
+            className="hidden sm:flex h-auto py-1.5 text-base font-medium transition-all duration-300 hover:scale-105 hover:bg-gradient-to-r hover:from-blue-500/10 hover:to-purple-600/10 hover:text-blue-600"
+          >
+            <Link href="/pricing">Pricing</Link>
+          </Button>
+        </div>
 
         {/* Navigation Links & Auth */}
         <div className="flex items-center gap-4">

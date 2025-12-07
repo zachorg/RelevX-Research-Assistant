@@ -89,8 +89,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-background/80">
-      <Navbar />
-
       {/* Hero Section */}
       <section className="container-wide py-20 md:py-32">
         <motion.div

@@ -3,7 +3,6 @@
 import React from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
-import { Navbar } from "@/components/navigation/navbar";
 
 export default function DashboardLayout({
   children,
@@ -33,7 +32,6 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
       <main className="container-wide py-8">{children}</main>
     </div>
   );

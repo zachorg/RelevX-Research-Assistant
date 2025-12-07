@@ -5,6 +5,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
+import { Navbar } from "@/components/navigation/navbar";
 
 export const metadata: Metadata = {
   title: "RelevX - AI-Powered Research Assistant",
@@ -20,7 +21,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="antialiased min-h-screen">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <Navbar />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
