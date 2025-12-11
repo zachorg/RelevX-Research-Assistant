@@ -275,12 +275,41 @@ export async function executeResearchForProject(
         break;
       }
 
+      // 7.4.a Filter results using LLM (Pre-fetch filtering)
+      // This saves tokens/time by not fetching irrelevant pages
+      let resultsToFetch = limitedResults;
+      
+      if (llmProvider.filterSearchResults && limitedResults.length > 0) {
+        console.log("Filtering search results with LLM...");
+        const resultsForFilter = limitedResults.map(r => ({
+          url: r.url,
+          title: r.title,
+          description: r.description
+        }));
+
+        try {
+          const filtered = await llmProvider.filterSearchResults(
+            resultsForFilter, 
+            project.description
+          );
+          
+          const urlsToKeep = new Set(
+            filtered.filter(f => f.keep).map(f => f.url)
+          );
+
+          resultsToFetch = limitedResults.filter(r => urlsToKeep.has(r.url));
+          console.log(`LLM filtered ${limitedResults.length} results down to ${resultsToFetch.length}`);
+        } catch (err) {
+          console.warn("LLM filtering failed, proceeding with all results:", err);
+        }
+      }
+
       // 7.4 Extract content
-      console.log(`Extracting content from ${limitedResults.length} URLs...`);
+      console.log(`Extracting content from ${resultsToFetch.length} URLs...`);
       const extractedContents = await extractMultipleContents(
-        limitedResults.map((r) => r.url),
+        resultsToFetch.map((r) => r.url),
         undefined,
-        concurrentExtractions
+        5 // Increased concurrency from 3 to 5
       );
 
       totalUrlsFetched += extractedContents.length;

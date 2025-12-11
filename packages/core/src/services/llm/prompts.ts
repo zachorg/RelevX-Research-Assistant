@@ -48,6 +48,38 @@ Generate 5 diverse search queries. Return ONLY a JSON object with this structure
 };
 
 /**
+ * Prompt templates for search result filtering
+ */
+export const SEARCH_RESULT_FILTERING_PROMPTS: PromptConfig = {
+  model: "gpt-4o-mini",
+  responseFormat: "json_object",
+  system: `You are a strict research curator. Your task is to filter search results based on their title and snippet to decide if they are worth reading.
+
+Criteria for keeping:
+1. Directly relevant to the user's project.
+2. Likely to contain substantial information (not just a landing page or login screen).
+3. Not a duplicate or low-quality SEO spam site.
+
+Be strict. We only want to fetch the most promising content.`,
+  user: `Project Description:
+{{description}}
+
+Search Results to Filter:
+{{results}}
+
+Evaluate each result and return ONLY a JSON object with this structure:
+{
+  "results": [
+    {
+      "url": "the result url",
+      "keep": true/false,
+      "reasoning": "brief reason"
+    }
+  ]
+}`,
+};
+
+/**
  * Prompt templates for relevancy analysis
  */
 export const RELEVANCY_ANALYSIS_PROMPTS: PromptConfig = {
@@ -144,6 +176,7 @@ export function renderPrompt(
  */
 export type PromptType =
   | "query-generation"
+  | "search-result-filtering"
   | "relevancy-analysis"
   | "report-compilation";
 
@@ -153,6 +186,8 @@ export function getPromptConfig(type: PromptType): PromptConfig {
       return QUERY_GENERATION_PROMPTS;
     case "relevancy-analysis":
       return RELEVANCY_ANALYSIS_PROMPTS;
+    case "search-result-filtering":
+      return SEARCH_RESULT_FILTERING_PROMPTS;
     case "report-compilation":
       return REPORT_COMPILATION_PROMPTS;
     default:
