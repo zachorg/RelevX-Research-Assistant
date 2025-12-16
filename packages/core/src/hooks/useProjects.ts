@@ -2,6 +2,10 @@
  * useProjects hook
  *
  * Provides real-time access to a user's projects and methods to manage them.
+ *
+ * @param userId - The user ID to fetch projects for
+ * @param dbInstance - Optional Firebase Firestore instance (defaults to core's Firebase instance)
+ * @param isAdminSDK - Optional flag indicating if using Admin SDK (defaults to core's default)
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -30,7 +34,11 @@ interface UseProjectsResult {
   deleteProject: (projectId: string) => Promise<boolean>;
 }
 
-export function useProjects(userId: string | undefined): UseProjectsResult {
+export function useProjects(
+  userId: string | undefined,
+  dbInstance?: any,
+  isAdminSDK?: boolean
+): UseProjectsResult {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,13 +53,18 @@ export function useProjects(userId: string | undefined): UseProjectsResult {
     setLoading(true);
     setError(null);
 
-    const unsubscribe = subscribeToProjects(userId, (newProjects) => {
-      setProjects(newProjects);
-      setLoading(false);
-    });
+    const unsubscribe = subscribeToProjects(
+      userId,
+      (newProjects) => {
+        setProjects(newProjects);
+        setLoading(false);
+      },
+      dbInstance,
+      isAdminSDK
+    );
 
     return unsubscribe;
-  }, [userId]);
+  }, [userId, dbInstance, isAdminSDK]);
 
   const createProject = useCallback(
     async (data: Omit<NewProject, "userId">): Promise<Project | null> => {
@@ -61,7 +74,12 @@ export function useProjects(userId: string | undefined): UseProjectsResult {
       }
 
       try {
-        const newProject = await createProjectService(userId, data);
+        const newProject = await createProjectService(
+          userId,
+          data,
+          dbInstance,
+          isAdminSDK
+        );
         return newProject;
       } catch (err) {
         const errorMessage =
@@ -70,7 +88,7 @@ export function useProjects(userId: string | undefined): UseProjectsResult {
         return null;
       }
     },
-    [userId]
+    [userId, dbInstance, isAdminSDK]
   );
 
   const updateProject = useCallback(
@@ -84,7 +102,13 @@ export function useProjects(userId: string | undefined): UseProjectsResult {
       }
 
       try {
-        await updateProjectService(userId, projectId, data);
+        await updateProjectService(
+          userId,
+          projectId,
+          data,
+          dbInstance,
+          isAdminSDK
+        );
         return true;
       } catch (err) {
         const errorMessage =
@@ -93,7 +117,7 @@ export function useProjects(userId: string | undefined): UseProjectsResult {
         return false;
       }
     },
-    [userId]
+    [userId, dbInstance, isAdminSDK]
   );
 
   const toggleProjectActive = useCallback(
@@ -104,7 +128,13 @@ export function useProjects(userId: string | undefined): UseProjectsResult {
       }
 
       try {
-        await updateProjectStatus(userId, projectId, status);
+        await updateProjectStatus(
+          userId,
+          projectId,
+          status,
+          dbInstance,
+          isAdminSDK
+        );
         return true;
       } catch (err) {
         const errorMessage =
@@ -115,7 +145,7 @@ export function useProjects(userId: string | undefined): UseProjectsResult {
         return false;
       }
     },
-    [userId]
+    [userId, dbInstance, isAdminSDK]
   );
 
   const deleteProject = useCallback(
@@ -126,7 +156,7 @@ export function useProjects(userId: string | undefined): UseProjectsResult {
       }
 
       try {
-        await deleteProjectService(userId, projectId);
+        await deleteProjectService(userId, projectId, dbInstance, isAdminSDK);
         return true;
       } catch (err) {
         const errorMessage =
@@ -135,7 +165,7 @@ export function useProjects(userId: string | undefined): UseProjectsResult {
         return false;
       }
     },
-    [userId]
+    [userId, dbInstance, isAdminSDK]
   );
 
   return {

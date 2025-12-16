@@ -3,7 +3,7 @@ const nextConfig = {
   transpilePackages: ["core"],
 
   // Webpack configuration (for when not using Turbopack)
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, webpack }) => {
     // Exclude server-only modules from client bundle
     if (!isServer) {
       config.resolve.fallback = {
@@ -20,8 +20,26 @@ const nextConfig = {
         os: false,
         child_process: false,
         "firebase-admin": false,
+        util: false,
       };
+
+      config.plugins.push(
+        new webpack.NormalModuleReplacementPlugin(/^node:/, (resource) => {
+          resource.request = resource.request.replace(/^node:/, "");
+        })
+      );
     }
+
+    // Enable WebAssembly support
+    config.experiments = {
+      ...config.experiments,
+      asyncWebAssembly: true,
+    };
+
+    config.module.rules.push({
+      test: /\.wasm$/,
+      type: "webassembly/async",
+    });
 
     return config;
   },

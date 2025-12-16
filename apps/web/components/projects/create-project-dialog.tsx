@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
-import { useProjects } from "@/hooks/use-projects";
+import { useProjects } from "core";
+import { db } from "@/lib/firebase";
 import type { Frequency, ResultsDestination } from "@/lib/projects";
 import {
   Dialog,
@@ -30,7 +31,7 @@ export function CreateProjectDialog({
   onOpenChange,
 }: CreateProjectDialogProps) {
   const { user, userProfile } = useAuth();
-  const { createProject } = useProjects(userProfile?.uid);
+  const { createProject } = useProjects(userProfile?.uid, db, false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -101,6 +102,11 @@ export function CreateProjectDialog({
         resultsDestination,
         deliveryTime,
         timezone,
+        settings: {
+          relevancyThreshold: 60,
+          minResults: 5,
+          maxResults: 20,
+        },
         ...(Object.keys(searchParameters).length > 0 && { searchParameters }),
       });
 

@@ -44,7 +44,7 @@ services:
 
     # Health check
     healthcheck:
-      test: [ "CMD", "node", "-e", "console.log('healthy')" ]
+      test: ["CMD", "node", "-e", "console.log('healthy')"]
       interval: 60s
       timeout: 10s
       retries: 3
@@ -52,8 +52,8 @@ services:
 
   relevx-backend:
     build:
-      context: ./apps/backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/backend/Dockerfile
     image: relevx-backend:latest
     container_name: relevx-backend
     restart: always

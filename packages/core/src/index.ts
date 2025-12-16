@@ -20,6 +20,14 @@ export type {
 export type { Plan, PlanInfo, FetchPlansResponse } from "./models/plans";
 
 export type {
+  RelevxUserBilling,
+  BillingIntentResponse,
+  BillingPaymentLinkResponse,
+  ActivateFreeTrialRequest,
+  ActivateFreeTrialResponse,
+} from "./models/billing";
+
+export type {
   SearchResult,
   NewSearchResult,
   SearchResultSummary,

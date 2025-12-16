@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/auth-context";
-import { useProjects } from "@/hooks/use-projects";
+import { useProjects } from "core";
+import { db } from "@/lib/firebase";
 import type { Project, Frequency, ResultsDestination } from "@/lib/projects";
 import {
   Dialog,
@@ -31,7 +32,7 @@ export function EditProjectSettingsDialog({
   onOpenChange,
 }: EditProjectSettingsDialogProps) {
   const { user } = useAuth();
-  const { updateProject } = useProjects(user?.uid);
+  const { updateProject } = useProjects(user?.uid, db, false);
 
   const [title, setTitle] = useState(project.title);
   const [description, setDescription] = useState(project.description);

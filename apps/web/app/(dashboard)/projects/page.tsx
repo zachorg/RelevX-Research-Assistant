@@ -4,22 +4,23 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, FolderOpen } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
-import { useProjects } from "@/hooks/use-projects";
+import { useProjects } from "core";
+import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { ProjectCard } from "@/components/projects/project-card";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 
 export default function ProjectsPage() {
   const { user, userProfile } = useAuth();
-  const { projects, loading } = useProjects(user?.uid);
+  const { projects, loading } = useProjects(user?.uid, db, false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   // Sort projects: active projects first, then paused projects
   const sortedProjects = [...projects].sort((a, b) => {
-    // If both have same active status, maintain original order (by createdAt)
-    if (a.isActive === b.isActive) return 0;
+    // If both have same status, maintain original order (by createdAt)
+    if (a.status === b.status) return 0;
     // Active projects come first
-    return a.isActive ? -1 : 1;
+    return a.status === "active" ? -1 : 1;
   });
 
   const handleCreateProject = () => {

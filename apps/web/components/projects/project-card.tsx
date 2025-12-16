@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
-import { useProjects } from "@/hooks/use-projects";
+import { useProjects } from "core";
+import { db } from "@/lib/firebase";
 import type { Project } from "@/lib/projects";
 import {
   Card,
@@ -41,7 +42,11 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project }: ProjectCardProps) {
   const { user } = useAuth();
-  const { toggleProjectActive, deleteProject } = useProjects(user?.uid);
+  const { toggleProjectActive, deleteProject } = useProjects(
+    user?.uid,
+    db,
+    false
+  );
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);

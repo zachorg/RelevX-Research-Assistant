@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import type Stripe from "stripe";
-import { RelevxUserProfile, CreateProfileResponse } from "core/models/users";
+import type { RelevxUserProfile, CreateProfileResponse } from "core";
 
 // API key management routes: create/list/revoke. All routes rely on the auth
 // plugin to populate req.userId and tenant authorization.
@@ -51,22 +51,23 @@ const routes: FastifyPluginAsync = async (app) => {
             billing: {
               stripeSubscriptionId: "",
               stripeCustomerId: customer.id,
-            }
+            },
           };
 
           // New user, create document
           await userRef.set(userData);
 
-          const { uid, billing, ...userResponse } = userData;
+          const { billing, ...userResponse } = userData;
           response = {
             ...userResponse,
-            ok: true
+            ok: true,
           };
-        }
-        else {
+        } else {
           const userData = userDoc.data() as RelevxUserProfile;
           if (!userData) {
-            return rep.status(404).send({ error: { message: "User not found" } });
+            return rep
+              .status(404)
+              .send({ error: { message: "User not found" } });
           }
 
           // Build update object with only the fields we want to change
@@ -76,7 +77,11 @@ const routes: FastifyPluginAsync = async (app) => {
           };
 
           // check to see if user has valid stripe customer id
-          if (!userData.billing.stripeCustomerId || (await stripe.customers.retrieve(userData.billing.stripeCustomerId)).lastResponse.statusCode !== 200) {
+          if (
+            !userData.billing.stripeCustomerId ||
+            (await stripe.customers.retrieve(userData.billing.stripeCustomerId))
+              .lastResponse.statusCode !== 200
+          ) {
             const customer = await stripe.customers.create({
               email: user.email,
               phone: user.phoneNumber,
@@ -87,9 +92,14 @@ const routes: FastifyPluginAsync = async (app) => {
 
           // check to see if user is still subscribed
           if (userData.billing.stripeSubscriptionId !== "") {
-            const subscription = await stripe.subscriptions.retrieve(userData.billing.stripeSubscriptionId);
+            const subscription = await stripe.subscriptions.retrieve(
+              userData.billing.stripeSubscriptionId
+            );
             console.log("Subscription status:", subscription.status);
-            if (subscription.status !== "active" && subscription.status !== "trialing") {
+            if (
+              subscription.status !== "active" &&
+              subscription.status !== "trialing"
+            ) {
               updateFields.planId = "";
               updateFields["billing.stripeSubscriptionId"] = "";
             }
@@ -98,10 +108,10 @@ const routes: FastifyPluginAsync = async (app) => {
           // Update user document in Firestore
           await userRef.update(updateFields);
 
-          const { uid, billing, ...userResponse } = userData;
+          const { billing, ...userResponse } = userData;
           response = {
             ...userResponse,
-            ok: true
+            ok: true,
           };
         }
 

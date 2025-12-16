@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import type { PlanInfo, Plan } from "core/models/plans";
+import type { PlanInfo, Plan } from "core";
 
 // API key management routes: create/list/revoke. All routes rely on the auth
 // plugin to populate req.userId and tenant authorization.

@@ -1,9 +1,12 @@
 import type { FastifyPluginAsync } from "fastify";
 import type Stripe from "stripe";
-import { ActivateFreeTrialRequest, BillingIntentResponse, BillingPaymentLinkResponse } from "core/models/billing";
-import { RelevxUserProfile } from "core/models/users";
-import { Plan } from "core/models/plans";
-
+import type {
+  ActivateFreeTrialRequest,
+  BillingIntentResponse,
+  BillingPaymentLinkResponse,
+  RelevxUserProfile,
+  Plan,
+} from "core";
 
 // API key management routes: create/list/revoke. All routes rely on the auth
 // plugin to populate req.userId and tenant authorization.
@@ -38,7 +41,7 @@ const routes: FastifyPluginAsync = async (app) => {
 
         const userData = userDoc.data() as RelevxUserProfile;
         const setupIntent = await stripe.setupIntents.create({
-          customer: userData.stripeCustomerId,
+          customer: userData.billing.stripeCustomerId,
           payment_method_types: ["card", "us_bank_account"], // or ['us_bank_account'] for ACH
         });
 
@@ -78,9 +81,12 @@ const routes: FastifyPluginAsync = async (app) => {
             .status(401)
             .send({ error: { message: "Unauthenticated" } });
         }
-        const planId = (req.headers as any).planid || (req.headers as any).planId;
+        const planId =
+          (req.headers as any).planid || (req.headers as any).planId;
         if (!planId) {
-          return rep.status(400).send({ error: { message: "Plan ID is required" } });
+          return rep
+            .status(400)
+            .send({ error: { message: "Plan ID is required" } });
         }
         const planDoc = await db.collection("plans").doc(planId).get();
         if (!planDoc.exists) {
@@ -106,7 +112,7 @@ const routes: FastifyPluginAsync = async (app) => {
           customer_update: { address: "auto" },
           // payment_method_options: { card: { setup_future_usage: "on_session" } },
           line_items: [
-            { price: planData.infoStripeSubscriptionId, quantity: 1 }
+            { price: planData.infoStripeSubscriptionId, quantity: 1 },
           ],
 
           // @TODO: Update this to use the actual success and cancel URLs
@@ -153,7 +159,9 @@ const routes: FastifyPluginAsync = async (app) => {
 
         const request = req.body as ActivateFreeTrialRequest;
         if (!request.planId) {
-          return rep.status(400).send({ error: { message: "Plan ID is required" } });
+          return rep
+            .status(400)
+            .send({ error: { message: "Plan ID is required" } });
         }
 
         const planRef = db.collection("plans").doc(request.planId);
@@ -175,11 +183,12 @@ const routes: FastifyPluginAsync = async (app) => {
         const userDoc = await userRef.get();
         if (!userDoc.exists) {
           return rep.status(404).send({ error: { message: "User not found" } });
-        }
-        else {
+        } else {
           const userData = userDoc.data() as RelevxUserProfile;
           if (userData.freeTrailRedeemed) {
-            return rep.status(400).send({ error: { message: "Free trial already redeemed" } });
+            return rep
+              .status(400)
+              .send({ error: { message: "Free trial already redeemed" } });
           }
 
           const subscription = await stripe.subscriptions.create({
@@ -191,8 +200,7 @@ const routes: FastifyPluginAsync = async (app) => {
             payment_behavior: "allow_incomplete",
           });
 
-          const newUserData =
-          {
+          const newUserData = {
             ...userData,
             planId: planData.id,
             freeTrailRedeemed: true,
@@ -202,14 +210,14 @@ const routes: FastifyPluginAsync = async (app) => {
               ...userData.billing,
               stripeSubscriptionId: subscription.id,
             },
-          }
+          };
 
           // Update user document in Firestore
           await userRef.update(newUserData);
         }
 
         return rep.status(200).send({
-          ok: true
+          ok: true,
         });
       } catch (err: any) {
         const isDev = process.env.NODE_ENV !== "production";
