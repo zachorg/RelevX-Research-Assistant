@@ -3,8 +3,8 @@ import type { ProjectInfo, ListProjectsResponse, CreateProjectRequest, CreatePro
 import { Frequency } from "core";
 import { set, isAfter, add } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
-import { isUserSubscribed } from "../utils/billing";
-import { getUserData } from "../utils/user";
+import { isUserSubscribed } from "../utils/billing.js";
+import { getUserData } from "../utils/user.js";
 
 /**
  * Add one frequency period to a date

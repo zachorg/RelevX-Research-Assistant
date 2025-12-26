@@ -14,8 +14,8 @@ interface AwsPluginOptions {
     region?: string;
 }
 
-const awsPlugin: FastifyPluginAsync<AwsPluginOptions> = async (fastify, options) => {
-    const region = options.region || process.env.AWS_REGION || 'us-east-1';
+const awsPlugin: FastifyPluginAsync<AwsPluginOptions> = async (fastify, _options) => {
+    const region = 'us-east-1';
 
     // Initialize AWS Secrets Manager Client
     // Credentials will be automatically resolved from the environment or default provider chain

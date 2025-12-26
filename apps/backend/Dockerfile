@@ -1,3 +1,5 @@
+# To build run: docker build -f apps/backend/Dockerfile -t relevx-backend . 
+
 FROM node:20-slim AS builder
 WORKDIR /app
 
@@ -11,8 +13,9 @@ COPY packages/core/src ./packages/core/src
 
 # Copy backend app
 COPY apps/backend/package.json ./apps/backend/
-COPY apps/backend/tsconfig.json ./apps/backend/
+COPY apps/backend/tsconfig.json apps/backend/tsconfig.build.json ./apps/backend/
 COPY apps/backend/src ./apps/backend/src
+# COPY apps/backend/.env ./apps/backend/.env
 
 # Install pnpm
 RUN npm install -g pnpm
@@ -24,7 +27,7 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm --filter core build
 
 # Build backend and verify dist folder exists
-RUN pnpm --filter relevx build && \
+RUN pnpm --filter relevx run build:docker && \
     ls -la /app/apps/backend/dist
 
 FROM node:20-slim AS runtime

@@ -114,10 +114,13 @@ const routes: FastifyPluginAsync = async (app) => {
           line_items: [
             { price: planData.infoStripeSubscriptionId, quantity: 1 },
           ],
-
+          metadata: {
+            userId: userId,
+            planId: planId,
+          },
           // @TODO: Update this to use the actual success and cancel URLs
-          success_url: "https://relevx.com/success",
-          cancel_url: "https://relevx.com/cancel",
+          success_url: "https://relevx.com/pricing?success=true",
+          cancel_url: "https://relevx.com/pricing?success=false",
         });
 
         if (!session) {
@@ -231,44 +234,6 @@ const routes: FastifyPluginAsync = async (app) => {
           },
         });
       }
-    }
-  );
-
-  app.post(
-    "/webhook",
-    {
-      config: {
-        rawBody: true,
-      },
-    },
-    async (request, reply) => {
-      const sig = request.headers["stripe-signature"] as string;
-
-      let event;
-      try {
-        if (!request.rawBody) {
-          throw new Error("Missing raw body");
-        }
-        event = stripe.webhooks.constructEvent(
-          request.rawBody,
-          sig,
-          process.env.STRIPE_WEBHOOK_SECRET!
-        );
-      } catch (err: any) {
-        request.log.error(err);
-        return reply.code(400).send(`Webhook Error: ${err.message}`);
-      }
-
-      if (event.type === "checkout.session.completed") {
-        // const session = event.data.object as Stripe.Checkout.Session;
-
-        // const subscriptionId = session.subscription;
-        // const customerId = session.customer;
-
-        // ✅ Grant access in your DB here
-      }
-
-      return reply.send({ received: true });
     }
   );
 

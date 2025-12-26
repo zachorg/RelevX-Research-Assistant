@@ -92,4 +92,3 @@ ENTRYPOINT ["dumb-init", "--"]
 
 # Start the scheduler
 CMD ["node", "dist/services/scheduler/src/index.js"]
-

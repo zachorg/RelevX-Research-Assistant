@@ -13,6 +13,7 @@ import userAuthRoutes from "./routes/userAuth.js";
 import userProjectsRoutes from "./routes/userProjects.js";
 import rawBody from "fastify-raw-body";
 import aws from "./plugins/aws.js";
+import stripeRoute from "./routes/stripeRoute.js";
 
 // set env path location
 
@@ -90,6 +91,7 @@ await app.register(stripe);
 
 // Business routes
 await app.register(userBillingRoutes, { prefix: "/api/v1/user/billing" });
+await app.register(stripeRoute, { prefix: "api/v1/stripe" });
 await app.register(productsRoutes, { prefix: "/api/v1/products" });
 await app.register(userAuthRoutes, { prefix: "/api/v1/user/auth" });
 await app.register(userProjectsRoutes, { prefix: "/api/v1/user/projects" });

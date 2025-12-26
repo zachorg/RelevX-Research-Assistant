@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import type Stripe from "stripe";
 import type { RelevxUserProfile, CreateProfileResponse } from "core";
-import { isUserSubscribed } from "../utils/billing";
+import { isUserSubscribed } from "../utils/billing.js";
 
 // API key management routes: create/list/revoke. All routes rely on the auth
 // plugin to populate req.userId and tenant authorization.

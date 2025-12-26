@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense, useEffect } from "react";
 import { usePlans } from "@/hooks/use-plans";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { signInWithGoogle } from "@/lib/auth";
 import { PlanInfo } from "core/models/plans";
 import { ActivateFreeTrialRequest, BillingPaymentLinkResponse } from "core/models/billing";
-
+import { useSearchParams, useRouter } from "next/navigation";
 
 import { relevx_api } from "@/lib/client";
 
@@ -19,6 +19,17 @@ function PricingContent() {
   const { user, userProfile, loading: userLoading, reloadUser } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<PlanInfo | null>(null);
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Handle success/failure dialog state
+  const successParam = searchParams.get("success");
+  const showStatusDialog = successParam !== null;
+  const isSuccess = successParam === "true";
+
+  const handleCloseStatusDialog = () => {
+    router.replace("/pricing");
+  };
 
   const handleSelectPlanStart = async (planId: string) => {
     if (userLoading) return;
@@ -156,6 +167,8 @@ function PricingContent() {
             </Card>
           ))}
         </div>
+
+        {/* Plan Selection / Payment Dialog */}
         <Dialog open={!!selectedPlan} onOpenChange={(open) => !open && setSelectedPlan(null)}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
@@ -200,6 +213,32 @@ function PricingContent() {
           </DialogContent>
         </Dialog>
 
+        {/* Success / Failure Status Dialog */}
+        <Dialog open={showStatusDialog} onOpenChange={(open) => !open && handleCloseStatusDialog()}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>{isSuccess ? "Subscription Successful" : "Subscription Failed"}</DialogTitle>
+              <DialogDescription>
+                {isSuccess
+                  ? "Thank you for subscribing! Your account has been updated and you now have access to all features of your selected plan."
+                  : "There was an issue processing your payment. Please try again or contact support if the problem persists."}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                onClick={handleCloseStatusDialog}
+                className={
+                  isSuccess
+                    ? "bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg hover:scale-105 transition-all duration-200"
+                    : "bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-md hover:shadow-lg hover:scale-105 transition-all duration-200"
+                }
+              >
+                {isSuccess ? "Continue" : "Close"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {plans.length === 0 && !loading && (
           <div className="text-center py-10 text-muted-foreground">
             No plans available at the moment.
@@ -212,6 +251,8 @@ function PricingContent() {
 
 export default function PricingPage() {
   return (
-    <PricingContent />
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]">Loading...</div>}>
+      <PricingContent />
+    </Suspense>
   );
 }
