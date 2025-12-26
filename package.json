@@ -6,6 +6,7 @@
     "dev:web": "cd apps/web && pnpm dev",
     "dev:mobile": "cd apps/mobile && pnpm start",
     "build:web": "cd apps/web && pnpm build",
+    "vercel-build": "pnpm --filter web build",
     "clean": "pnpm -r exec rm -rf node_modules && rm -rf node_modules",
     "install:all": "pnpm install",
     "test:openai": "tsx scripts/test-openai.ts",
