@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import type { Project } from "@/lib/projects";
 import {
   Dialog,
   DialogContent,
@@ -12,9 +11,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
+import { ProjectInfo } from "core";
 
 interface DeleteProjectDialogProps {
-  project: Project;
+  project: ProjectInfo;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDelete: (projectId: string) => Promise<boolean>;

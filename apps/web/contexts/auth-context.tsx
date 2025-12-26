@@ -24,7 +24,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const reloadUser = async () => {
     try {
-      const userProfile = await createOrUpdateUser();
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error("No authenticated user");
+      }
+
+      const response = await createOrUpdateUser();
+
+      const userProfile: RelevxUser = {
+        ...response,
+        uid: currentUser.uid,
+      };
       setUserProfile(userProfile);
     } catch (error) {
       console.error("Error creating/updating user document:", error);
@@ -36,7 +46,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (newUser) {
         // Ensure user document exists in Firestore
         try {
-          const userProfile = await createOrUpdateUser();
+          const currentUser = auth.currentUser;
+          if (!currentUser) {
+            throw new Error("No authenticated user");
+          }
+
+          const response = await createOrUpdateUser();
+          const userProfile: RelevxUser = {
+            ...response,
+            uid: currentUser.uid,
+          };
           setUserProfile(userProfile);
         } catch (error) {
           console.error("Error creating/updating user document:", error);
