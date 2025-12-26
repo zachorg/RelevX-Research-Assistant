@@ -1,18 +1,19 @@
 "use client";
 
-import React from "react";
+import { useEffect, type ReactNode } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
 
+// Use explicit type to avoid namespace collisions with React 19 types
 export default function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: any;
 }) {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!loading && !user) {
       router.push("/");
     }
