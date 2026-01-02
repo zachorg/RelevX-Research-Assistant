@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import type { ProjectInfo, ListProjectsResponse, CreateProjectRequest, CreateProjectResponse } from "core";
+import type { ProjectInfo, ListProjectsResponse, CreateProjectRequest, CreateProjectResponse, ProjectStatus, RelevxUserProfile, Plan, Project } from "core";
 import { Frequency } from "core";
 import { set, isAfter, add } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
@@ -269,6 +269,18 @@ const routes: FastifyPluginAsync = async (app) => {
     return snapshot.docs[0];
   };
 
+  const getAllProjectsWithStatus = async (userId: string, status: ProjectStatus) => {
+    const snapshot = await db
+      .collection("users")
+      .doc(userId)
+      .collection("projects")
+      .where("status", "==", status as any as string)
+      .get();
+
+    if (snapshot.empty) return null;
+    return snapshot.docs;
+  };
+
   app.post(
     "/update",
     { preHandler: [app.rlPerRoute(10)] },
@@ -352,8 +364,32 @@ const routes: FastifyPluginAsync = async (app) => {
           }
           else {
             app.log.info("User is subscribed");
-            // @TODO: Make sure subscription plan allows for this project to be active based on its config.
-            nStatus = status;
+            const docs = await getAllProjectsWithStatus(userId, "active");
+            if (!docs) {
+              errorCode = "invalid_active_projects";
+              errorMessage = "User reportidly has null active projects";
+            }
+            if (docs) {
+              const plansRef = db.collection("plans").doc(userData.user.planId);
+              const plansDoc = await plansRef.get();
+              const plansData = plansDoc.data() as Plan;
+
+              // Go through all the projects in 'docs' and count the max number of daily runs happening in a 30-Day period
+              let totalDailyRuns = 0;
+              docs.forEach(doc => {
+                const data: Project = doc.data() as Project;
+                if (data.frequency === "daily") totalDailyRuns++;
+
+              });
+              const maxDailyRuns = plansData.settingsMaxDailyRuns;
+              if (totalDailyRuns >= maxDailyRuns) {
+                errorCode = "max_daily_runs";
+                errorMessage = "User has reached the maximum number of daily runs. Please subscribe to a higher plan, if available.";
+              }
+              else {
+                nStatus = status;
+              }
+            }
           }
         }
 
