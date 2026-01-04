@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import type { ProjectInfo, ListProjectsResponse, CreateProjectRequest, CreateProjectResponse, ProjectStatus, RelevxUserProfile, Plan, Project } from "core";
+import type { ProjectInfo, ListProjectsResponse, CreateProjectRequest, CreateProjectResponse, ProjectStatus, Plan, Project } from "core";
 import { Frequency } from "core";
 import { set, isAfter, add } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
@@ -366,8 +366,7 @@ const routes: FastifyPluginAsync = async (app) => {
             app.log.info("User is subscribed");
             const docs = await getAllProjectsWithStatus(userId, "active");
             if (!docs) {
-              errorCode = "invalid_active_projects";
-              errorMessage = "User reportidly has null active projects";
+              nStatus = status;
             }
             if (docs) {
               const plansRef = db.collection("plans").doc(userData.user.planId);

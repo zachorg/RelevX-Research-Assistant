@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import { CompiledReport } from "../llm/types";
+import { ClientReport } from "../llm/types";
 import { marked } from "marked";
 
 // Initialize Resend client
@@ -22,7 +22,7 @@ function getResendClient(): Resend {
  */
 export async function sendReportEmail(
   to: string,
-  report: CompiledReport,
+  report: ClientReport,
   projectId: string
 ): Promise<{ success: boolean; id?: string; error?: any }> {
   try {

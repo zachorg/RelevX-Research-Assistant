@@ -76,3 +76,7 @@ export interface CompiledReport {
   resultCount: number;
   averageScore: number;
 }
+
+export interface ClientReport extends Omit<CompiledReport, "summary" | "resultCount" | "averageScore"> {
+
+}

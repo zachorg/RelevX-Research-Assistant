@@ -41,13 +41,11 @@ export interface DeliveryLog {
   status: "pending" | "success" | "failed" | "partial"; // Delivery status
   error?: string; // Error message if delivery failed
   retryCount: number; // Number of delivery retry attempts
-  preparedAt?: number; // When research completed (for pending status)
 
   // References
   searchResultIds: string[]; // IDs of SearchResults included in this report
 
   // Timestamps
-  deliveredAt?: number; // When delivery was attempted/completed (undefined for pending status)
   researchStartedAt: number; // When the research process started
   researchCompletedAt: number; // When the research process completed
 }
@@ -55,7 +53,7 @@ export interface DeliveryLog {
 /**
  * Delivery log data for creation
  */
-export interface NewDeliveryLog extends Omit<DeliveryLog, "id"> {}
+export interface NewDeliveryLog extends Omit<DeliveryLog, "id"> { }
 
 /**
  * Simplified delivery log for listing

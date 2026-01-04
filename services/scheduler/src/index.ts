@@ -18,7 +18,11 @@ import { loadAwsSecrets } from "./plugins/aws";
 dotenv.config();
 
 // Import types from core package
-import type { Project } from "core";
+import type { NewDeliveryLog, Project, RelevxUserProfile } from "core";
+import { sendReportEmail } from "../../../packages/core/src/services/email";
+
+// Import scheduling utility
+import { calculateNextRunAt } from "core";
 
 // Provider instances (initialized once at startup)
 let providersInitialized = false;
@@ -307,7 +311,7 @@ async function runResearchJob(): Promise<void> {
     }
 
     if (projectsToRun.length === 0) {
-      logger.debug("No projects need research");
+      logger.info("No projects need research");
       return;
     }
 
@@ -331,7 +335,7 @@ async function runResearchJob(): Promise<void> {
         const deliveryLogId = await executeProjectResearch(
           userId,
           project,
-          isRetry ? "success" : "pending"
+          "pending" // Always set to pending so delivery job handles it
         );
 
         if (deliveryLogId) {
@@ -341,29 +345,22 @@ async function runResearchJob(): Promise<void> {
             researchStartedAt: null,
             lastError: null,
             updatedAt: Date.now(),
+            preparedDeliveryLogId: deliveryLogId,
           };
 
           if (isRetry) {
-            // For retry, update lastRunAt and nextRunAt immediately
-            updates.lastRunAt = Date.now();
-            updates.nextRunAt = calculateNextRunAt(
-              project.frequency,
-              project.deliveryTime,
-              project.timezone,
-              // Date.now()
-            );
+            // For retry, we DO NOT update nextRunAt here.
+            // We leave it in the past so the Delivery Job picks it up immediately.
+            // The Delivery Job will send the email and THEN update nextRunAt.
 
             logger.info("Retry research succeeded", {
               userId,
               projectId: project.id,
               deliveryLogId,
               retryAttempt,
-              nextRunAt: new Date(updates.nextRunAt).toISOString(),
             });
           } else {
             // For pre-run, just save the prepared delivery log
-            updates.preparedDeliveryLogId = deliveryLogId;
-
             logger.info("Pre-run research completed", {
               userId,
               projectId: project.id,
@@ -467,15 +464,16 @@ async function runDeliveryJob(): Promise<void> {
     // @TODO: Use pagination to avoid loading all projects at once
     // @TODO: Future update ^ - will become non-scalable 
     const usersSnapshot = await db.collection("users").get();
-    let projectsToDeliver: Array<{ userId: string; project: Project }> = [];
+    let projectsToDeliver: Array<{ userId: string; userRef: any; project: Project, projectRef: any }> = [];
 
     for (const userDoc of usersSnapshot.docs) {
       const userId = userDoc.id;
 
-      // Query active projects where nextRunAt <= now AND preparedDeliveryLogId is not null
-      const projectsSnapshot = await db
+      const userRef = await db
         .collection("users")
-        .doc(userId)
+        .doc(userId);
+      // Query active projects where nextRunAt <= now AND preparedDeliveryLogId is not null
+      const projectsSnapshot = await userRef
         .collection("projects")
         .where("status", "==", "active")
         .where("nextRunAt", "<=", now)
@@ -489,76 +487,119 @@ async function runDeliveryJob(): Promise<void> {
 
         // Only include if has prepared delivery log
         if (project.preparedDeliveryLogId) {
-          projectsToDeliver.push({ userId, project });
+          projectsToDeliver.push({ userId, userRef, project, projectRef: projectDoc.ref });
         }
       }
     }
 
     if (projectsToDeliver.length === 0) {
-      logger.debug("No projects ready for delivery");
+      logger.info("No projects ready for delivery");
       return;
     }
 
     logger.info(`Delivering results for ${projectsToDeliver.length} projects`);
 
-    // Import scheduling utility
-    const { calculateNextRunAt } = await import("core");
-
     // Update delivery logs and projects
-    for (const { userId, project } of projectsToDeliver) {
-      try {
-        // Update delivery log status from pending to success
-        await db
-          .collection("users")
-          .doc(userId)
-          .collection("projects")
-          .doc(project.id)
-          .collection("deliveryLogs")
-          .doc(project.preparedDeliveryLogId!)
-          .update({
-            status: "success",
-            deliveredAt: Date.now(),
-          });
-
-        // Calculate next run time
-        const nextRunAt = calculateNextRunAt(
-          project.frequency,
-          project.deliveryTime,
-          project.timezone,
-          // now
-        );
-
-        // Update project
-        await db
-          .collection("users")
-          .doc(userId)
-          .collection("projects")
-          .doc(project.id)
-          .update({
-            lastRunAt: now,
-            nextRunAt,
-            preparedDeliveryLogId: null,
-            updatedAt: Date.now(),
-          });
-
-        logger.info("Results delivered successfully", {
-          userId,
-          projectId: project.id,
-          deliveryLogId: project.preparedDeliveryLogId,
-          nextRunAt: new Date(nextRunAt).toISOString(),
-        });
-      } catch (error: any) {
-        logger.error("Delivery failed", {
-          userId,
-          projectId: project.id,
-          error: error.message,
-        });
-      }
+    for (const { userId, userRef, project, projectRef } of projectsToDeliver) {
+      sendClientProjectReport(userId, userRef, project, projectRef);
     }
   } catch (error: any) {
     logger.error("Delivery job failed", {
       error: error.message,
       stack: error.stack,
+    });
+  }
+}
+
+async function sendClientProjectReport(userId: string, userRef: any, project: Project, projectRef: any) {
+  const now = Date.now();
+  try {
+    const deliveryLogSnapshot = await projectRef.collection("deliveryLogs").where("status", "==", "pending").get();
+    if (deliveryLogSnapshot.docs.length === 0) {
+      logger.warn("Project has no pending delivery log (s)", {
+        userId,
+        projectId: project.id,
+      });
+      return;
+    }
+    // Load user (for email fallback)
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) {
+      logger.error("User not found", {
+        userId,
+        projectId: project.id,
+        deliveryLogId: project.preparedDeliveryLogId,
+      });
+      return;
+    }
+    const userData = userDoc.data() as RelevxUserProfile;
+    const userEmail = userData.email;
+
+    // Send email if configured
+    const deliveryEmail = project.deliveryConfig?.email?.address || userEmail;
+
+    if (
+      project.resultsDestination === "email" &&
+      deliveryEmail
+    ) {
+      logger.info(`Sending report (s) email to ${deliveryEmail}...`);
+
+      for (const deliveryLogDoc of deliveryLogSnapshot.docs) {
+        const deliveryLogRef = await projectRef.collection("deliveryLogs").doc(deliveryLogDoc.id);
+        const deliveryLog = deliveryLogDoc.data() as NewDeliveryLog;
+
+        try {
+          const emailResult = await sendReportEmail(
+            deliveryEmail,
+            { title: deliveryLog.reportTitle, markdown: deliveryLog.reportMarkdown },
+            project.id
+          );
+
+          if (emailResult.success) {
+            console.log("Email sent successfully:", emailResult.id);
+
+            // Update delivery log status from pending to success
+            await deliveryLogRef.update({
+              status: "success",
+              deliveredAt: Date.now(),
+            });
+
+            // Calculate next run time
+            const nextRunAt = calculateNextRunAt(
+              project.frequency,
+              project.deliveryTime,
+              project.timezone,
+              // now
+            );
+
+            // Update project
+            await projectRef
+              .update({
+                lastRunAt: now,
+                nextRunAt,
+                preparedDeliveryLogId: null,
+                updatedAt: Date.now(),
+              });
+
+            logger.info("Results delivered successfully", {
+              userId,
+              projectId: project.id,
+              deliveryLogId: project.preparedDeliveryLogId,
+              nextRunAt: new Date(nextRunAt).toISOString(),
+            });
+          } else {
+            logger.error("Failed to send email:", emailResult.error);
+          }
+        } catch (emailError) {
+          logger.error("Exception sending email:", emailError);
+        }
+      }
+    }
+  } catch (error: any) {
+    logger.error("Delivery failed", {
+      userId,
+      projectId: project.id,
+      error: error.message,
     });
   }
 }
@@ -573,7 +614,7 @@ async function runSchedulerJob(): Promise<void> {
   try {
     // Run both jobs in parallel
     // Research job handles both pre-runs and retries
-    // Delivery job handles marking prepared results as sent
+    // Delivery job handles marking prepared results as sent and sending emails
     await Promise.all([runResearchJob(), runDeliveryJob()]);
 
     const duration = Date.now() - startTime;

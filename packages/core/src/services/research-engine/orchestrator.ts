@@ -22,10 +22,9 @@ import type {
   SearchFilters,
 } from "../../interfaces/search-provider";
 import { extractMultipleContents } from "../content-extractor";
-import { calculateNextRunAt, validateFrequency } from "../../utils/scheduling";
+import { validateFrequency } from "../../utils/scheduling";
 import { getSearchHistory, updateSearchHistory } from "./search-history";
 import { saveSearchResults, saveDeliveryLog } from "./result-storage";
-import { sendReportEmail } from "../email";
 import type { ResearchOptions, ResearchResult } from "./types";
 
 // Default providers (can be overridden via options)
@@ -118,11 +117,6 @@ export async function executeResearchForProject(
     }
 
     const project = { id: projectDoc.id, ...projectDoc.data() } as Project;
-
-    // 1.5 Load user (for email fallback)
-    const userRef = db.collection("users").doc(userId);
-    const userDoc = await userRef.get();
-    const userEmail = userDoc.exists ? userDoc.data()?.email : undefined;
 
     // 2. Validate frequency (prevent running too often)
     if (
@@ -563,64 +557,23 @@ export async function executeResearchForProject(
         Date.now()
       );
 
-      // 10.6 Send email if configured
-      const deliveryEmail = project.deliveryConfig?.email?.address || userEmail;
+      // 11. Update search history
+      const newProcessedUrls: ProcessedUrl[] = sortedResults.map((r) => ({
+        url: r.url,
+        normalizedUrl: r.normalizedUrl,
+        firstSeenAt: r.fetchedAt,
+        timesFound: 1,
+        lastRelevancyScore: r.relevancyScore,
+        wasIncluded: true,
+      }));
 
-      if (
-        project.resultsDestination === "email" &&
-        deliveryEmail
-      ) {
-        console.log(`Sending report email to ${deliveryEmail}...`);
-        try {
-          const emailResult = await sendReportEmail(
-            deliveryEmail,
-            report,
-            projectId
-          );
-
-          if (emailResult.success) {
-            console.log("Email sent successfully:", emailResult.id);
-          } else {
-            console.error("Failed to send email:", emailResult.error);
-          }
-        } catch (emailError) {
-          console.error("Exception sending email:", emailError);
-        }
-      }
+      await updateSearchHistory(
+        userId,
+        projectId,
+        newProcessedUrls,
+        queryPerformanceMap
+      );
     }
-
-    // 11. Update search history
-    const newProcessedUrls: ProcessedUrl[] = sortedResults.map((r) => ({
-      url: r.url,
-      normalizedUrl: r.normalizedUrl,
-      firstSeenAt: r.fetchedAt,
-      timesFound: 1,
-      lastRelevancyScore: r.relevancyScore,
-      wasIncluded: true,
-    }));
-
-    await updateSearchHistory(
-      userId,
-      projectId,
-      newProcessedUrls,
-      queryPerformanceMap
-    );
-
-    // 12. Calculate next run time
-    const nextRunAt = calculateNextRunAt(
-      project.frequency,
-      project.deliveryTime,
-      project.timezone,
-      /*startedAt*/
-    );
-
-    // 13. Update project execution tracking
-    await projectRef.update({
-      lastRunAt: startedAt,
-      nextRunAt,
-      status: "active",
-      updatedAt: Date.now(),
-    });
 
     const completedAt = Date.now();
 
