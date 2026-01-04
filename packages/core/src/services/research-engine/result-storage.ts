@@ -79,7 +79,7 @@ export async function saveDeliveryLog(
 
   // Determine destination and address based on project configuration
   let destination: "email" | "slack" | "sms" = "email"; // Default
-  let deliveryStatus = "pending";
+  let destinationAddress = "pending";
 
   if (project.resultsDestination !== "none" && project.deliveryConfig) {
     if (
@@ -87,19 +87,19 @@ export async function saveDeliveryLog(
       project.deliveryConfig.email
     ) {
       destination = "email";
-      deliveryStatus = project.deliveryConfig.email.address;
+      destinationAddress = project.deliveryConfig.email.address;
     } else if (
       project.resultsDestination === "slack" &&
       project.deliveryConfig.slack
     ) {
       destination = "slack";
-      deliveryStatus = project.deliveryConfig.slack.webhookUrl;
+      destinationAddress = project.deliveryConfig.slack.webhookUrl;
     } else if (
       project.resultsDestination === "sms" &&
       project.deliveryConfig.sms
     ) {
       destination = "sms";
-      deliveryStatus = project.deliveryConfig.sms.phoneNumber;
+      destinationAddress = project.deliveryConfig.sms.phoneNumber;
     }
   }
 
@@ -108,7 +108,7 @@ export async function saveDeliveryLog(
     userId,
     // Delivery destination and address
     destination,
-    deliveryStatus,
+    destinationAddress,
     reportMarkdown: report.markdown,
     reportTitle: report.title,
     stats,
