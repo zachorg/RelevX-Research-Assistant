@@ -18,7 +18,7 @@ dotenv.config();
 
 // Import types from core package
 import type { NewDeliveryLog, Project, RelevxUserProfile } from "core";
-import { sendReportEmail } from "../../../packages/core/src/services/email";
+import { sendReportEmail } from "core";
 
 // Import scheduling utility
 import { calculateNextRunAt } from "core";

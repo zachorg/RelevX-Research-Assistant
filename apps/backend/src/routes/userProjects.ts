@@ -1,5 +1,16 @@
 import type { FastifyPluginAsync } from "fastify";
-import type { ProjectInfo, ListProjectsResponse, CreateProjectRequest, CreateProjectResponse, ProjectStatus, Plan, Project } from "core";
+import type {
+  ProjectInfo,
+  ListProjectsResponse,
+  CreateProjectRequest,
+  CreateProjectResponse,
+  ProjectStatus,
+  Plan,
+  Project,
+  RelevxDeliveryLog,
+  DeliveryLog,
+  ProjectDeliveryLogResponse,
+} from "core";
 import { Frequency } from "core";
 import { set, isAfter, add } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
@@ -34,7 +45,7 @@ function addFrequencyPeriod(date: Date, frequency: Frequency): Date {
 function calculateNextRunAt(
   frequency: Frequency,
   deliveryTime: string,
-  timezone: string,
+  timezone: string
   // lastRunAt?: number
 ): number {
   // Parse delivery time
@@ -80,14 +91,13 @@ const routes: FastifyPluginAsync = async (app) => {
   });
 
   // Secure project subscription via WebSockets
-  app.get(
-    "/subscribe",
-    { websocket: true },
-    (connection, req: any) => {
-      try {
-        // Manually authenticate since preHandler doesn't run for websockets
-        const idToken = req.query?.["token"] as string;
-        app.introspectIdToken(idToken).then((res) => {
+  app.get("/subscribe", { websocket: true }, (connection, req: any) => {
+    try {
+      // Manually authenticate since preHandler doesn't run for websockets
+      const idToken = req.query?.["token"] as string;
+      app
+        .introspectIdToken(idToken)
+        .then((res) => {
           if (!res?.user?.uid) {
             connection.send(JSON.stringify({ error: "Unauthenticated" }));
             connection.close();
@@ -115,7 +125,9 @@ const routes: FastifyPluginAsync = async (app) => {
               },
               (err: any) => {
                 app.log.error(err, "Firestore onSnapshot error");
-                connection?.send(JSON.stringify({ error: "Internal server error" }));
+                connection?.send(
+                  JSON.stringify({ error: "Internal server error" })
+                );
               }
             );
 
@@ -123,24 +135,24 @@ const routes: FastifyPluginAsync = async (app) => {
             console.log("WebSocket closed");
             unsubscribe();
           });
-        }).catch((err) => {
+        })
+        .catch((err) => {
           app.log.error(err, "WebSocket auth failed");
           if (connection) {
-            connection?.send(JSON.stringify({ error: "Authentication failed" }));
+            connection?.send(
+              JSON.stringify({ error: "Authentication failed" })
+            );
             connection?.close();
           }
         });
-
-
-      } catch (error) {
-        app.log.error(error, "WebSocket setup failed");
-        if (connection) {
-          connection?.send(JSON.stringify({ error: "Internal server error" }));
-          connection?.close();
-        }
+    } catch (error) {
+      app.log.error(error, "WebSocket setup failed");
+      if (connection) {
+        connection?.send(JSON.stringify({ error: "Internal server error" }));
+        connection?.close();
       }
     }
-  );
+  });
 
   app.get(
     "/list",
@@ -155,10 +167,16 @@ const routes: FastifyPluginAsync = async (app) => {
         }
 
         // Create or update user document in Firestore
-        const projectsSnapshot = await db.collection("users").doc(userId).collection("projects").orderBy("createdAt", "desc")
+        const projectsSnapshot = await db
+          .collection("users")
+          .doc(userId)
+          .collection("projects")
+          .orderBy("createdAt", "desc")
           .get();
         if (projectsSnapshot.empty) {
-          return rep.status(404).send({ error: { message: "No projects found" } });
+          return rep
+            .status(404)
+            .send({ error: { message: "No projects found" } });
         }
 
         const projects = projectsSnapshot.docs.map((doc: any) => {
@@ -179,6 +197,81 @@ const routes: FastifyPluginAsync = async (app) => {
           error: {
             code: "internal_error",
             message: "User projects list failed",
+            ...(isDev ? { detail } : {}),
+          },
+        });
+      }
+    }
+  );
+
+  app.get(
+    "/delivery-logs",
+    { preHandler: [app.rlPerRoute(10)] },
+    async (req: any, rep) => {
+      try {
+        const userId = req.user?.uid;
+        if (!userId) {
+          return rep
+            .status(401)
+            .send({ error: { message: "Unauthenticated" } });
+        }
+
+        const projectId = (req.headers as any).projectId;
+        if (!projectId) {
+          return rep
+            .status(400)
+            .send({ error: { message: "Project ID is required" } });
+        }
+
+        // First find the project by title
+        const projectDoc = await getProjectByTitle(userId, projectId);
+        if (!projectDoc) {
+          return rep.status(404).send({
+            error: {
+              message: "No project found with project id '" + projectId + "'",
+            },
+          });
+        }
+
+        // Now get the delivery logs for this specific project
+        const deliveryLogsSnapshot = await projectDoc.ref
+          .collection("deliveryLogs")
+          .orderBy("preparedAt", "desc")
+          .get();
+
+        if (deliveryLogsSnapshot.empty) {
+          return rep.status(404).send({
+            error: {
+              message: "No delivery logs found for project '" + projectId + "'",
+            },
+          });
+        }
+
+        const logs = deliveryLogsSnapshot.docs.map((doc: any) => {
+          const {
+            id,
+            projectId,
+            userId,
+            destination,
+            destinationAddress,
+            stats,
+            searchResultIds,
+            ...data
+          } = doc.data() as DeliveryLog;
+          return data as RelevxDeliveryLog;
+        });
+
+        return rep.status(200).send({
+          logs,
+        } as ProjectDeliveryLogResponse);
+      } catch (err: any) {
+        const isDev = process.env.NODE_ENV !== "production";
+        const detail = err instanceof Error ? err.message : String(err);
+        req.log?.error({ detail }, "/userProjects/delivery-logs failed");
+        return rep.status(500).send({
+          error: {
+            code: "internal_error",
+            message: "User projects delivery logs failed to fetch",
             ...(isDev ? { detail } : {}),
           },
         });
@@ -214,9 +307,9 @@ const routes: FastifyPluginAsync = async (app) => {
           .get();
 
         if (!existingProjectSnapshot.empty) {
-          return rep
-            .status(400)
-            .send({ error: { message: "Project with this title already exists" } });
+          return rep.status(400).send({
+            error: { message: "Project with this title already exists" },
+          });
         }
 
         const projectData = {
@@ -232,7 +325,10 @@ const routes: FastifyPluginAsync = async (app) => {
           updatedAt: new Date().toISOString(),
         };
 
-        const projectRef = db.collection("users").doc(userId).collection("projects");
+        const projectRef = db
+          .collection("users")
+          .doc(userId)
+          .collection("projects");
         await projectRef.add(projectData);
 
         const { userId: _userId, ...projectInfo } = projectData;
@@ -269,7 +365,10 @@ const routes: FastifyPluginAsync = async (app) => {
     return snapshot.docs[0];
   };
 
-  const getAllProjectsWithStatus = async (userId: string, status: ProjectStatus) => {
+  const getAllProjectsWithStatus = async (
+    userId: string,
+    status: ProjectStatus
+  ) => {
     const snapshot = await db
       .collection("users")
       .doc(userId)
@@ -288,21 +387,32 @@ const routes: FastifyPluginAsync = async (app) => {
       try {
         const userId = req.user?.uid;
         const { title, data } = req.body;
-        if (!userId) return rep.status(401).send({ error: { message: "Unauthenticated" } });
-        if (!title) return rep.status(400).send({ error: { message: "Title is required" } });
+        if (!userId)
+          return rep
+            .status(401)
+            .send({ error: { message: "Unauthenticated" } });
+        if (!title)
+          return rep
+            .status(400)
+            .send({ error: { message: "Title is required" } });
 
         const doc = await getProjectByTitle(userId, title);
-        if (!doc) return rep.status(404).send({ error: { message: "Project not found" } });
+        if (!doc)
+          return rep
+            .status(404)
+            .send({ error: { message: "Project not found" } });
 
         await doc.ref.update({
           ...data,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
         });
 
         return rep.status(200).send({ ok: true });
       } catch (err: any) {
         req.log?.error(err, "/user/projects/update failed");
-        return rep.status(500).send({ error: { message: "Failed to update project" } });
+        return rep
+          .status(500)
+          .send({ error: { message: "Failed to update project" } });
       }
     }
   );
@@ -314,17 +424,28 @@ const routes: FastifyPluginAsync = async (app) => {
       try {
         const userId = req.user?.uid;
         const { title } = req.body;
-        if (!userId) return rep.status(401).send({ error: { message: "Unauthenticated" } });
-        if (!title) return rep.status(400).send({ error: { message: "Title is required" } });
+        if (!userId)
+          return rep
+            .status(401)
+            .send({ error: { message: "Unauthenticated" } });
+        if (!title)
+          return rep
+            .status(400)
+            .send({ error: { message: "Title is required" } });
 
         const doc = await getProjectByTitle(userId, title);
-        if (!doc) return rep.status(404).send({ error: { message: "Project not found" } });
+        if (!doc)
+          return rep
+            .status(404)
+            .send({ error: { message: "Project not found" } });
 
         await doc.ref.delete();
         return rep.status(200).send({ ok: true });
       } catch (err: any) {
         req.log?.error(err, "/user/projects/delete failed");
-        return rep.status(500).send({ error: { message: "Failed to delete project" } });
+        return rep
+          .status(500)
+          .send({ error: { message: "Failed to delete project" } });
       }
     }
   );
@@ -336,20 +457,32 @@ const routes: FastifyPluginAsync = async (app) => {
       try {
         const userId = req.user?.uid;
         const { title, status } = req.body;
-        if (!userId) return rep.status(401).send({ error: { message: "Unauthenticated" } });
-        if (!title) return rep.status(400).send({ error: { message: "Title is required" } });
+        if (!userId)
+          return rep
+            .status(401)
+            .send({ error: { message: "Unauthenticated" } });
+        if (!title)
+          return rep
+            .status(400)
+            .send({ error: { message: "Title is required" } });
 
         const doc = await getProjectByTitle(userId, title);
-        if (!doc) return rep.status(404).send({ error: { message: "Project not found" } });
+        if (!doc)
+          return rep
+            .status(404)
+            .send({ error: { message: "Project not found" } });
 
         let nStatus: string = doc.data().status;
         let cStatus: string = nStatus;
-        if (nStatus === status) return rep.status(400).send({ error: { message: "Project status is already " + status } });
+        if (nStatus === status)
+          return rep.status(400).send({
+            error: { message: "Project status is already " + status },
+          });
 
         let errorCode = "";
         let errorMessage = "";
 
-        const allowToggle = (nStatus !== "running" && nStatus !== "error");
+        const allowToggle = nStatus !== "running" && nStatus !== "error";
         if (!allowToggle) {
           errorCode = "invalid_status";
           errorMessage = "Invalid status";
@@ -357,12 +490,14 @@ const routes: FastifyPluginAsync = async (app) => {
         const activateNewProject = status === "active" && allowToggle;
         if (activateNewProject) {
           const userData = await getUserData(userId, db);
-          const isSubscribed = await isUserSubscribed(userData.user, app.stripe);
+          const isSubscribed = await isUserSubscribed(
+            userData.user,
+            app.stripe
+          );
           if (!isSubscribed) {
             errorCode = "invalid_subscription";
             errorMessage = "User is not subscribed";
-          }
-          else {
+          } else {
             app.log.info("User is subscribed");
             const docs = await getAllProjectsWithStatus(userId, "active");
             if (!docs) {
@@ -375,17 +510,16 @@ const routes: FastifyPluginAsync = async (app) => {
 
               // Go through all the projects in 'docs' and count the max number of daily runs happening in a 30-Day period
               let totalDailyRuns = 0;
-              docs.forEach(doc => {
+              docs.forEach((doc) => {
                 const data: Project = doc.data() as Project;
                 if (data.frequency === "daily") totalDailyRuns++;
-
               });
               const maxDailyRuns = plansData.settingsMaxDailyRuns;
               if (totalDailyRuns >= maxDailyRuns) {
                 errorCode = "max_daily_runs";
-                errorMessage = "User has reached the maximum number of daily runs. Please subscribe to a higher plan, if available.";
-              }
-              else {
+                errorMessage =
+                  "User has reached the maximum number of daily runs. Please subscribe to a higher plan, if available.";
+              } else {
                 nStatus = status;
               }
             }
@@ -400,27 +534,28 @@ const routes: FastifyPluginAsync = async (app) => {
           app.log.info("Updating project status to " + nStatus);
           await doc.ref.update({
             status: nStatus,
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
           });
         }
 
         app.log.info({
           status: nStatus,
           errorCode,
-          errorMessage
+          errorMessage,
         });
         return rep.status(200).send({
           status: nStatus,
           errorCode,
-          errorMessage
+          errorMessage,
         });
       } catch (err: any) {
         req.log?.error(err, "/user/projects/toggle-status failed");
-        return rep.status(500).send({ error: { message: "Failed to toggle status" } });
+        return rep
+          .status(500)
+          .send({ error: { message: "Failed to toggle status" } });
       }
     }
   );
 };
 
 export default routes;
-

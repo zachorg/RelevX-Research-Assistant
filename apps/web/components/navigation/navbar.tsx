@@ -41,6 +41,7 @@ export function Navbar() {
   };
 
   const getPlanStatus = () => {
+    if (!userProfile) return "";
     if (!userProfile?.planId) return "Inactive";
     const userPlan = plans.find((p) => p.id === userProfile.planId);
     if (!userPlan) return "Inactive";
@@ -82,7 +83,7 @@ export function Navbar() {
           {/* Logo / Brand */}
           <div className="flex items-center gap-6">
             <Link
-              href={user ? "/projects" : "/"}
+              href="/"
               className="flex items-center gap-2 group"
             >
               <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600">
@@ -93,12 +94,22 @@ export function Navbar() {
               </span>
             </Link>
 
+            {planStatus === "Inactive" && (
+              <Button
+                variant="ghost"
+                asChild
+                className="hidden sm:flex h-auto py-1.5 text-base font-medium transition-all duration-300 hover:scale-105 hover:bg-gradient-to-r hover:from-blue-500/10 hover:to-purple-600/10 hover:text-blue-600"
+              >
+                <Link href="/pricing">Pricing</Link>
+              </Button>
+            )}
+
             <Button
               variant="ghost"
               asChild
               className="hidden sm:flex h-auto py-1.5 text-base font-medium transition-all duration-300 hover:scale-105 hover:bg-gradient-to-r hover:from-blue-500/10 hover:to-purple-600/10 hover:text-blue-600"
             >
-              <Link href="/pricing">Pricing</Link>
+              <Link href="/projects">Projects</Link>
             </Button>
           </div>
 

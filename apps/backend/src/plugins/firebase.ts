@@ -5,22 +5,26 @@ import { getFirestore } from "firebase-admin/firestore";
 
 export default fp(async (app: any) => {
   // Initialize Firebase Admin with service account credentials
-  const firebaseApp = initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_project_id,
-      privateKey: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_private_key,
-      clientEmail: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_client_email,
-    }),
-    projectId: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_project_id,
-  });
+  const firebaseApp = initializeApp(
+    {
+      credential: cert("apps/backend/relevx-service-account.json"),
+    }
+    //   {
+    //   credential: cert({
+    //     projectId: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_project_id,
+    //     privateKey: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_private_key,
+    //     clientEmail: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_client_email,
+    //   }),
+    //   projectId: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_project_id,
+    // }
+  );
 
   const auth = getAuth(firebaseApp);
   const db = getFirestore(firebaseApp);
 
   if (!auth || !db) {
     throw new Error("Failed to initialize Firebase Admin");
-  }
-  else {
+  } else {
     app.log.info("Firebase Admin initialized successfully");
   }
 
@@ -28,7 +32,9 @@ export default fp(async (app: any) => {
 
   app.decorate("introspectIdToken", async (token: string) => {
     try {
-      const authToken = token.startsWith("Bearer ") ? token.slice(7).trim() : token;
+      const authToken = token.startsWith("Bearer ")
+        ? token.slice(7).trim()
+        : token;
       const decodedToken = await auth.verifyIdToken(authToken);
       const uid = decodedToken.uid;
       const email = decodedToken.email;
@@ -44,7 +50,10 @@ export default fp(async (app: any) => {
 
           // Get plan if user has one
           if (userData?.plan_id) {
-            const planDoc = await db.collection("plans").doc(userData.plan_id).get();
+            const planDoc = await db
+              .collection("plans")
+              .doc(userData.plan_id)
+              .get();
             if (planDoc.exists) {
               const planData = planDoc.data();
               if (planData) {
@@ -55,7 +64,10 @@ export default fp(async (app: any) => {
         }
       } catch (error) {
         // Log error but don't fail authentication
-        app.log.warn({ error, uid }, "Failed to fetch user data from Firestore");
+        app.log.warn(
+          { error, uid },
+          "Failed to fetch user data from Firestore"
+        );
       }
 
       return {
@@ -64,10 +76,14 @@ export default fp(async (app: any) => {
           email,
           emailVerified,
           plan,
-        }
+        },
       };
     } catch (error) {
-      throw new Error(`Invalid Firebase ID token (${token}): ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Invalid Firebase ID token (${token}): ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   });
 });

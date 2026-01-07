@@ -241,8 +241,8 @@ export function CreateProjectDialog({
                 disabled={isCreating}
               >
                 <option value="email">Email</option>
-                <option value="slack">Slack</option>
-                <option value="sms">SMS</option>
+                {/* <option value="slack">Slack</option>
+                <option value="sms">SMS</option> */}
                 <option value="none">In-App Only</option>
               </Select>
               <p className="text-xs text-muted-foreground">

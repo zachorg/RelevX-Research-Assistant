@@ -18,7 +18,7 @@ export type {
   DeliveryConfig,
   ListProjectsResponse,
   CreateProjectRequest,
-  CreateProjectResponse
+  CreateProjectResponse,
 } from "./models/project";
 
 export type { Plan, PlanInfo, FetchPlansResponse } from "./models/plans";
@@ -44,6 +44,8 @@ export type {
   NewDeliveryLog,
   DeliveryLogSummary,
   DeliveryStats,
+  RelevxDeliveryLog,
+  ProjectDeliveryLogResponse,
 } from "./models/delivery-log";
 
 export type {
@@ -69,9 +71,7 @@ export type {
   CreateProfileResponse,
 } from "./models/users";
 
-export type {
-  AnalyticsDocument,
-} from "./models/analytics";
+export type { AnalyticsDocument } from "./models/analytics";
 
 // Services
 export { auth, db } from "./services/firebase";
@@ -154,7 +154,6 @@ export {
   isProjectDue,
 } from "./utils/scheduling";
 
-export {
-  saveDeliveryLog,
-  saveSearchResults,
-} from "./services/research-engine/result-storage";
+export { saveSearchResults } from "./services/research-engine/result-storage";
+
+export { sendReportEmail } from "./services/email";

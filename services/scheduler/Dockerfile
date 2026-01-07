@@ -1,4 +1,5 @@
 # Multi-stage build for smaller final image
+# To build run: docker build -f services/scheduler/Dockerfile -t relevx-scheduler .
 
 # Stage 1: Build stage
 FROM node:20-alpine AS builder
@@ -49,13 +50,14 @@ WORKDIR /app
 COPY pnpm-workspace.yaml ./
 COPY package.json pnpm-lock.yaml ./
 
-# Copy core package (only package.json for dependency resolution)
+# Copy core package.json to ensure its dependencies are installed
 COPY packages/core/package.json ./packages/core/
 
 # Copy scheduler package files
 COPY services/scheduler/package.json ./services/scheduler/
 
 # Install only production dependencies
+# This will install dependencies for both scheduler and core packages
 RUN pnpm install --frozen-lockfile --prod && \
     pnpm store prune
 

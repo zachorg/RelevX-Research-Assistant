@@ -18,7 +18,7 @@ export type {
   DeliveryConfig,
   ListProjectsResponse,
   CreateProjectRequest,
-  CreateProjectResponse
+  CreateProjectResponse,
 } from "./models/project";
 
 export type { Plan, PlanInfo, FetchPlansResponse } from "./models/plans";
@@ -42,6 +42,8 @@ export type {
 export type {
   DeliveryLog,
   NewDeliveryLog,
+  RelevxDeliveryLog,
+  ProjectDeliveryLogResponse,
   DeliveryLogSummary,
   DeliveryStats,
 } from "./models/delivery-log";

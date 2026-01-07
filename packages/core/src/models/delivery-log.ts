@@ -56,6 +56,18 @@ export interface DeliveryLog {
  */
 export interface NewDeliveryLog extends Omit<DeliveryLog, "id"> {}
 
+export interface RelevxDeliveryLog
+  extends Omit<
+    DeliveryLog,
+    | "id"
+    | "projectId"
+    | "userId"
+    | "destination"
+    | "destinationAddress"
+    | "stats"
+    | "searchResultIds"
+  > {}
+
 /**
  * Simplified delivery log for listing
  */
@@ -66,4 +78,8 @@ export interface DeliveryLogSummary {
   status: "success" | "failed" | "partial";
   deliveredAt: number;
   includedResults: number;
+}
+
+export interface ProjectDeliveryLogResponse {
+  logs: RelevxDeliveryLog[];
 }

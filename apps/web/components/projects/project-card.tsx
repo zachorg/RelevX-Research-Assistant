@@ -27,6 +27,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   MoreVertical,
   Settings,
@@ -36,8 +37,6 @@ import {
   Calendar,
   CheckCircle2,
   Circle,
-  Pause,
-  Play,
 } from "lucide-react";
 import { DeleteProjectDialog } from "./delete-project-dialog";
 import { EditProjectSettingsDialog } from "./edit-project-settings-dialog";
@@ -150,23 +149,6 @@ export function ProjectCard({ project }: ProjectCardProps) {
                   <Settings className="w-4 h-4" />
                   Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  className={`gap-2 ${isToggling ? "opacity-50 pointer-events-none" : ""
-                    }`}
-                  onClick={isToggling ? undefined : handleToggleActive}
-                >
-                  {project.status === "active" ? (
-                    <>
-                      <Pause className="w-4 h-4" />
-                      {isToggling ? "Pausing..." : "Pause"}
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-4 h-4" />
-                      {isToggling ? "Resuming..." : "Resume"}
-                    </>
-                  )}
-                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="gap-2 text-destructive focus:text-destructive"
@@ -217,11 +199,18 @@ export function ProjectCard({ project }: ProjectCardProps) {
         </CardContent>
 
         <CardFooter className="border-t border-border/50 pt-4">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground w-full">
-            <Calendar className="w-3 h-3" />
-            <span>
-              Created {new Date(project.createdAt).toLocaleDateString()}
-            </span>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Calendar className="w-3 h-3" />
+              <span>
+                Created {new Date(project.createdAt).toLocaleDateString()}
+              </span>
+            </div>
+            <Switch
+              checked={project.status === "active"}
+              onCheckedChange={handleToggleActive}
+              disabled={isToggling}
+            />
           </div>
         </CardFooter>
       </Card>

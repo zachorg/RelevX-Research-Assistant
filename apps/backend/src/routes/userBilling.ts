@@ -25,16 +25,11 @@ const routes: FastifyPluginAsync = async (app) => {
       try {
         const userId = req.user?.uid;
         if (!userId) {
-          return rep
-            .status(401)
-            .send({ error: { message: "Unauthenticated" } });
+          return rep.status(401).send({ error: { message: "Unauthenticated" } });
         }
-        const planId =
-          (req.headers as any).planid || (req.headers as any).planId;
+        const planId = (req.headers as any).planId;
         if (!planId) {
-          return rep
-            .status(400)
-            .send({ error: { message: "Plan ID is required" } });
+          return rep.status(400).send({ error: { message: "Plan ID is required" } });
         }
         const planDoc = await db.collection("plans").doc(planId).get();
         if (!planDoc.exists) {

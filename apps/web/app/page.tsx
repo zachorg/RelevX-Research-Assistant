@@ -24,14 +24,7 @@ import {
 } from "lucide-react";
 
 export default function HomePage() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-
-  React.useEffect(() => {
-    if (user && !loading) {
-      router.push("/projects");
-    }
-  }, [user, loading, router]);
+  const { loading } = useAuth();
 
   const handleSignIn = async () => {
     try {

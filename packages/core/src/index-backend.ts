@@ -19,7 +19,7 @@ export type {
   ListProjectsResponse,
   CreateProjectRequest,
   CreateProjectResponse,
-  ToggleProjectStatusResponse
+  ToggleProjectStatusResponse,
 } from "./models/project";
 
 export type { Plan, PlanInfo, FetchPlansResponse } from "./models/plans";
@@ -39,3 +39,9 @@ export type {
   CreateProfileRequest,
   CreateProfileResponse,
 } from "./models/users";
+
+export type {
+  RelevxDeliveryLog,
+  DeliveryLog,
+  ProjectDeliveryLogResponse,
+} from "./models/delivery-log";
