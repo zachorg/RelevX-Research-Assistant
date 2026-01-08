@@ -35,7 +35,6 @@ import {
   Clock,
   Mail,
   Calendar,
-  CheckCircle2,
   Circle,
 } from "lucide-react";
 import { DeleteProjectDialog } from "./delete-project-dialog";
@@ -144,14 +143,6 @@ export function ProjectCard({ project }: ProjectCardProps) {
                   onCheckedChange={handleToggleActive}
                   disabled={isToggling}
                 />
-                {project.status === "active" ? (
-                  <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                ) : (
-                  <Circle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                )}
-                <span className="text-xs font-medium text-muted-foreground">
-                  {project.status === "active" ? "Active" : "Paused"}
-                </span>
               </div>
               <CardTitle className="text-xl mb-2 line-clamp-2">
                 {project.title}
