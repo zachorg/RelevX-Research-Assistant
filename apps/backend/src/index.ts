@@ -15,12 +15,12 @@ import rawBody from "fastify-raw-body";
 import fastifyCompress from "@fastify/compress";
 import aws from "./plugins/aws.js";
 import stripeRoute from "./routes/stripeRoute.js";
-import dotenv from "dotenv";
+// import dotenv from "dotenv";
 
 // Load .env file from the secrets directory or root
 // This will load environment variables before AWS Secrets Manager
-dotenv.config({ path: "apps/backend/.env" });
-dotenv.config(); // Also try loading from default .env location
+// dotenv.config({ path: "apps/backend/.env" });
+// dotenv.config(); // Also try loading from default .env location
 
 // Fastify app with structured logging enabled. We redact sensitive fields by
 // default to avoid leaking destinations/PII in application logs.
@@ -89,22 +89,22 @@ await app.register(errors);
 await app.register(aws);
 await app.register(fastifyCompress);
 
-// try {
-//   // defaulting to relevx-secrets, but this should be set in the environment
-//   const secretName = "relevx-backend-env";
-//   // The aws plugin decorates the app with the aws object
-//   const secrets = await app.aws.getSecret(secretName);
+try {
+  // defaulting to relevx-secrets, but this should be set in the environment
+  const secretName = "relevx-backend-env";
+  // The aws plugin decorates the app with the aws object
+  const secrets = await app.aws.getSecret(secretName);
 
-//   if (secrets) {
-//     const parsedSecrets = JSON.parse(secrets);
-//     for (const [key, value] of Object.entries(parsedSecrets)) {
-//       process.env[key] = value as string;
-//     }
-//     app.log.info(`Loaded secrets from AWS Secrets Manager: ${secretName}`);
-//   }
-// } catch (error) {
-//   app.log.warn(error, "Failed to load secrets from AWS Secrets Manager");
-// }
+  if (secrets) {
+    const parsedSecrets = JSON.parse(secrets);
+    for (const [key, value] of Object.entries(parsedSecrets)) {
+      process.env[key] = value as string;
+    }
+    app.log.info(`Loaded secrets from AWS Secrets Manager: ${secretName}`);
+  }
+} catch (error) {
+  app.log.warn(error, "Failed to load secrets from AWS Secrets Manager");
+}
 
 const PORT = Number(process.env.PORT || 3000);
 

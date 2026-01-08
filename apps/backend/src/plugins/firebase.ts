@@ -6,17 +6,17 @@ import { getFirestore } from "firebase-admin/firestore";
 export default fp(async (app: any) => {
   // Initialize Firebase Admin with service account credentials
   const firebaseApp = initializeApp(
-    {
-      credential: cert("relevx-service-account.json"),
-    }
-    //   {
-    //   credential: cert({
-    //     projectId: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_project_id,
-    //     privateKey: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_private_key,
-    //     clientEmail: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_client_email,
-    //   }),
-    //   projectId: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_project_id,
+    // {
+    //   credential: cert("relevx-service-account.json"),
     // }
+    {
+      credential: cert({
+        projectId: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_project_id,
+        privateKey: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_private_key,
+        clientEmail: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_client_email,
+      }),
+      projectId: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_project_id,
+    }
   );
 
   const auth = getAuth(firebaseApp);

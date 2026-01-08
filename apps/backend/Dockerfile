@@ -15,8 +15,8 @@ COPY packages/core/src ./packages/core/src
 COPY apps/backend/package.json ./apps/backend/
 COPY apps/backend/tsconfig.json apps/backend/tsconfig.build.json ./apps/backend/
 COPY apps/backend/src ./apps/backend/src
-COPY secrets/.env ./apps/backend/.env
-COPY secrets/relevx-service-account.json ./apps/backend/relevx-service-account.json
+# COPY secrets/.env ./apps/backend/.env
+# COPY secrets/relevx-service-account.json ./apps/backend/relevx-service-account.json
 
 # Install pnpm
 RUN npm install -g pnpm
@@ -56,8 +56,8 @@ COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
 COPY --from=builder /app/packages/core/dist ./packages/core/dist
 
 # Copy secrets from builder
-COPY --from=builder /app/apps/backend/.env ./apps/backend/.env
-COPY --from=builder /app/apps/backend/relevx-service-account.json ./apps/backend/relevx-service-account.json
+# COPY --from=builder /app/apps/backend/.env ./apps/backend/.env
+# COPY --from=builder /app/apps/backend/relevx-service-account.json ./apps/backend/relevx-service-account.json
 
 # RUNtime ENV variables
 ENV NODE_ENV=development
