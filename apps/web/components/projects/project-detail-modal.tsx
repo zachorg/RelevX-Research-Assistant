@@ -17,6 +17,8 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
 } from "lucide-react";
 import { useDeliveryLogs } from "@/hooks/use-delivery-logs";
@@ -323,7 +325,8 @@ function SettingsTab({
 
 // Delivery History Tab Component
 function DeliveryHistoryTab({ projectTitle }: { projectTitle: string }) {
-  const { logs, loading, error } = useDeliveryLogs(projectTitle);
+  const { logs, loading, error, pagination, page, goToNextPage, goToPrevPage } =
+    useDeliveryLogs(projectTitle);
   const [expandedLogIndex, setExpandedLogIndex] = useState<number | null>(null);
 
   const toggleExpand = (index: number) => {
@@ -400,12 +403,18 @@ function DeliveryHistoryTab({ projectTitle }: { projectTitle: string }) {
     );
   }
 
+  const totalPages = pagination
+    ? Math.ceil(pagination.total / pagination.limit)
+    : 1;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold">Past Deliveries</h3>
         <span className="text-sm text-muted-foreground">
-          {logs.length} deliveries
+          {pagination
+            ? `${pagination.total} total`
+            : `${logs.length} deliveries`}
         </span>
       </div>
 
@@ -509,6 +518,35 @@ function DeliveryHistoryTab({ projectTitle }: { projectTitle: string }) {
           </div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {pagination && pagination.total > pagination.limit && (
+        <div className="flex items-center justify-between pt-4 border-t border-border/50">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToPrevPage}
+            disabled={page === 0}
+            className="flex items-center gap-1"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {page + 1} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToNextPage}
+            disabled={!pagination.hasMore}
+            className="flex items-center gap-1"
+          >
+            Next
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

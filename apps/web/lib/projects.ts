@@ -261,21 +261,26 @@ export async function deleteProject(projectTitle: string): Promise<void> {
  * Get delivery logs for a project
  */
 export async function getProjectDeliveryLogs(
-  projectTitle: string
-): Promise<RelevxDeliveryLog[]> {
+  projectTitle: string,
+  limit: number = 5,
+  offset: number = 0
+): Promise<ProjectDeliveryLogResponse> {
   try {
     const response = await relevx_api.get<ProjectDeliveryLogResponse>(
-      `/api/v1/user/projects/delivery-logs`,
+      `/api/v1/user/projects/delivery-logs?limit=${limit}&offset=${offset}`,
       { projectId: projectTitle }
     );
     if (!response) {
       throw new Error("Failed to fetch delivery logs");
     }
-    return response.logs;
+    return response;
   } catch (error: any) {
-    // Return empty array for 404 (no logs yet)
+    // Return empty result for 404 (no logs yet)
     if (error?.status === 404) {
-      return [];
+      return {
+        logs: [],
+        pagination: { total: 0, limit, offset, hasMore: false },
+      };
     }
     throw error;
   }

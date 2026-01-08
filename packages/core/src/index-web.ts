@@ -44,6 +44,7 @@ export type {
   NewDeliveryLog,
   RelevxDeliveryLog,
   ProjectDeliveryLogResponse,
+  PaginationInfo,
   DeliveryLogSummary,
   DeliveryStats,
 } from "./models/delivery-log";

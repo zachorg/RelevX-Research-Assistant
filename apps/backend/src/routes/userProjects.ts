@@ -233,19 +233,39 @@ const routes: FastifyPluginAsync = async (app) => {
           });
         }
 
-        // Now get the delivery logs for this specific project
-        const deliveryLogsSnapshot = await projectDoc.ref
-          .collection("deliveryLogs")
-          .orderBy("preparedAt", "desc")
-          .get();
+        // Parse pagination parameters
+        const limit = Math.min(
+          Math.max(parseInt((req.query as any).limit) || 5, 1),
+          50
+        );
+        const offset = Math.max(parseInt((req.query as any).offset) || 0, 0);
 
-        if (deliveryLogsSnapshot.empty) {
-          return rep.status(404).send({
-            error: {
-              message: "No delivery logs found for project '" + projectId + "'",
-            },
-          });
+        // Get total count for pagination info
+        const allLogsSnapshot = await projectDoc.ref
+          .collection("deliveryLogs")
+          .count()
+          .get();
+        const total = allLogsSnapshot.data().count;
+
+        // Now get the delivery logs for this specific project with pagination
+        let query = projectDoc.ref
+          .collection("deliveryLogs")
+          .orderBy("preparedAt", "desc");
+
+        // Apply offset by fetching and skipping
+        if (offset > 0) {
+          const offsetSnapshot = await projectDoc.ref
+            .collection("deliveryLogs")
+            .orderBy("preparedAt", "desc")
+            .limit(offset)
+            .get();
+          if (!offsetSnapshot.empty) {
+            const lastDoc = offsetSnapshot.docs[offsetSnapshot.docs.length - 1];
+            query = query.startAfter(lastDoc);
+          }
         }
+
+        const deliveryLogsSnapshot = await query.limit(limit).get();
 
         const logs = deliveryLogsSnapshot.docs.map((doc: any) => {
           const {
@@ -263,6 +283,12 @@ const routes: FastifyPluginAsync = async (app) => {
 
         return rep.status(200).send({
           logs,
+          pagination: {
+            total,
+            limit,
+            offset,
+            hasMore: offset + logs.length < total,
+          },
         } as ProjectDeliveryLogResponse);
       } catch (err: any) {
         const isDev = process.env.NODE_ENV !== "production";

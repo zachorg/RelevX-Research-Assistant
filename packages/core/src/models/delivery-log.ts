@@ -80,6 +80,14 @@ export interface DeliveryLogSummary {
   includedResults: number;
 }
 
+export interface PaginationInfo {
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
 export interface ProjectDeliveryLogResponse {
   logs: RelevxDeliveryLog[];
+  pagination?: PaginationInfo;
 }
