@@ -289,27 +289,6 @@ function SettingsTab({
             </div>
           </div>
         </div>
-
-        {/* Quality Settings */}
-        <div className="p-4 rounded-lg border border-border/50">
-          <h4 className="font-medium mb-3">Quality Settings</h4>
-          <div className="grid gap-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                Relevancy Threshold:
-              </span>
-              <span>{project.settings?.relevancyThreshold ?? 60}%</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Min Results:</span>
-              <span>{project.settings?.minResults ?? 5}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Max Results:</span>
-              <span>{project.settings?.maxResults ?? 20}</span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
