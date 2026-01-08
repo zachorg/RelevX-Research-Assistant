@@ -70,6 +70,7 @@ await app.register(fastifyCors, {
     "Accept",
     "Origin",
     "planId",
+    "projectId",
     "token",
   ],
   methods: ["GET", "POST", "DELETE", "OPTIONS"],
