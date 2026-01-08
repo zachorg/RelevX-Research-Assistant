@@ -250,13 +250,13 @@ const routes: FastifyPluginAsync = async (app) => {
         // Now get the delivery logs for this specific project with pagination
         let query = projectDoc.ref
           .collection("deliveryLogs")
-          .orderBy("preparedAt", "desc");
+          .orderBy("researchCompletedAt", "desc");
 
         // Apply offset by fetching and skipping
         if (offset > 0) {
           const offsetSnapshot = await projectDoc.ref
             .collection("deliveryLogs")
-            .orderBy("preparedAt", "desc")
+            .orderBy("researchCompletedAt", "desc")
             .limit(offset)
             .get();
           if (!offsetSnapshot.empty) {
