@@ -58,13 +58,11 @@ services:
     container_name: relevx-backend
     restart: always
     ports:
-      - "8080:8080" # Exposed for Cloudflare Tunnel
+      - "3000:3000"
     volumes:
       - ./scripts:/app/scripts:ro
-      - ./secrets:/app/secrets:ro
-    env_file:
-      - .env
+      # - ./secrets:/app/secrets:ro
     environment:
-      - PORT=8080
+      - PORT=3000
     networks:
       - internal
