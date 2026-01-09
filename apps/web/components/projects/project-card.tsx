@@ -138,7 +138,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
                 <Switch
-                  checked={project.status === "active"}
+                  checked={project.status === "active" || project.status === "running"}
                   onCheckedChange={handleToggleActive}
                   disabled={isToggling}
                 />

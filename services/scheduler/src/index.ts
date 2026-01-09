@@ -241,26 +241,25 @@ async function createAdminNotification(
  * Any project without prepared results gets researched
  */
 async function runResearchJob(): Promise<void> {
-  try {
-    const { db } = await import("core");
-    const now = Date.now();
-    const checkWindowMs = getCheckWindowMs();
-    const prerunMaxTime = now + checkWindowMs;
+  // import db
+  const { db } = await import("core");
+  const now = Date.now();
+  const checkWindowMs = getCheckWindowMs();
+  const prerunMaxTime = now + checkWindowMs;
 
-    logger.debug("Running research job", {
-      checkingFrom: new Date(now).toISOString(),
-      checkingUntil: new Date(prerunMaxTime).toISOString(),
-      windowMinutes: checkWindowMs / 60000,
-    });
+  interface PolledProject {
+    userId: string;
+    project: Project;
+    projectRef: any;
+    isRetry: boolean;
+  }
 
+  // polls projects that need research
+  const pollResearchProjects = async (): Promise<Array<PolledProject>> => {
     // Query all users
     const usersSnapshot = await db.collection("users").get();
-    let projectsToRun: Array<{
-      userId: string;
-      project: Project;
-      isRetry: boolean;
-    }> = [];
 
+    let projectsToRun: Array<PolledProject> = [];
     for (const userDoc of usersSnapshot.docs) {
       const userId = userDoc.id;
 
@@ -282,7 +281,12 @@ async function runResearchJob(): Promise<void> {
 
         // Only include if no prepared delivery log
         if (!project.preparedDeliveryLogId) {
-          projectsToRun.push({ userId, project, isRetry: false });
+          projectsToRun.push({
+            userId,
+            project,
+            isRetry: false,
+            projectRef: projectDoc.ref,
+          } as PolledProject);
         }
       }
 
@@ -308,11 +312,104 @@ async function runResearchJob(): Promise<void> {
             (p) => p.project.id === project.id && p.userId === userId
           );
           if (!alreadyQueued) {
-            projectsToRun.push({ userId, project, isRetry: true });
+            projectsToRun.push({
+              userId,
+              project,
+              isRetry: true,
+              projectRef: projectDoc.ref,
+            } as PolledProject);
           }
         }
       }
     }
+
+    return projectsToRun;
+  };
+
+  // executes research for a single project
+  const executeResearchForProject = async (polledProject: PolledProject) => {
+    const { userId, project, isRetry, projectRef } = polledProject;
+    // Import scheduling utility for retry projects
+    const { calculateNextRunAt } = await import("core");
+
+    // Track retry attempts
+    const retryAttempt = isRetry ? (project.lastError ? 2 : 1) : 0;
+
+    const deliveryLogId = await executeProjectResearch(
+      userId,
+      project,
+      "pending" // Always set to pending so delivery job handles it
+    );
+
+    let projectUpdates: any = {
+      status: "active",
+      researchStartedAt: null,
+      updatedAt: Date.now(),
+    };
+
+    if (deliveryLogId) {
+      // Success - prepare project for delivery
+      projectUpdates = {
+        ...projectUpdates,
+        lastError: null,
+        preparedDeliveryLogId: deliveryLogId,
+      };
+
+      // For retry, we DO NOT update nextRunAt here.
+      // We leave it in the past so the Delivery Job picks it up immediately.
+      // The Delivery Job will send the email and THEN update nextRunAt.
+      // For pre-run, just save the prepared delivery log
+      logger.info(`${isRetry ? "Retry" : "Pre-run"} research succeeded`, {
+        userId,
+        projectId: project.id,
+        deliveryLogId,
+        retryAttempt,
+      });
+    } else {
+      // Research failed
+      if (isRetry && project.lastError) {
+        // Second failure - create admin notification
+        logger.error("Research failed after retry - notifying admin", {
+          userId,
+          projectId: project.id,
+          retryAttempt: 2,
+        });
+
+        await createAdminNotification(userId, project, project.lastError, 2);
+
+        // Move to next scheduled time to avoid infinite retries
+        const nextRunAt = calculateNextRunAt(
+          project.frequency,
+          project.deliveryTime,
+          project.timezone
+          // Date.now()
+        );
+
+        projectUpdates = {
+          ...projectUpdates,
+          nextRunAt,
+          lastRunAt: Date.now(),
+        };
+      } else {
+        // First failure - just clear running status, will retry later
+        logger.warn("Research failed, will retry at delivery time", {
+          userId,
+          projectId: project.id,
+          isRetry,
+        });
+      }
+    }
+    await projectRef.update(projectUpdates);
+  };
+  try {
+    logger.debug("Running research job", {
+      checkingFrom: new Date(now).toISOString(),
+      checkingUntil: new Date(prerunMaxTime).toISOString(),
+      windowMinutes: checkWindowMs / 60000,
+    });
+
+    // poll research projects
+    let projectsToRun: Array<PolledProject> = await pollResearchProjects();
 
     if (projectsToRun.length === 0) {
       logger.info("No projects need research");
@@ -327,119 +424,15 @@ async function runResearchJob(): Promise<void> {
       retry: retryCount,
     });
 
-    // Import scheduling utility for retry projects
-    const { calculateNextRunAt } = await import("core");
-
     // Execute research for each project
-    for (const { userId, project, isRetry } of projectsToRun) {
+    for (const polledProject of projectsToRun) {
       try {
-        // Track retry attempts
-        const retryAttempt = isRetry ? (project.lastError ? 2 : 1) : 0;
-
-        const deliveryLogId = await executeProjectResearch(
-          userId,
-          project,
-          "pending" // Always set to pending so delivery job handles it
-        );
-
-        if (deliveryLogId) {
-          // Success - prepare project for delivery
-          const updates: any = {
-            status: "active",
-            researchStartedAt: null,
-            lastError: null,
-            updatedAt: Date.now(),
-            preparedDeliveryLogId: deliveryLogId,
-          };
-
-          if (isRetry) {
-            // For retry, we DO NOT update nextRunAt here.
-            // We leave it in the past so the Delivery Job picks it up immediately.
-            // The Delivery Job will send the email and THEN update nextRunAt.
-
-            logger.info("Retry research succeeded", {
-              userId,
-              projectId: project.id,
-              deliveryLogId,
-              retryAttempt,
-            });
-          } else {
-            // For pre-run, just save the prepared delivery log
-            logger.info("Pre-run research completed", {
-              userId,
-              projectId: project.id,
-              deliveryLogId,
-            });
-          }
-
-          await db
-            .collection("users")
-            .doc(userId)
-            .collection("projects")
-            .doc(project.id)
-            .update(updates);
-        } else {
-          // Research failed
-          if (isRetry && project.lastError) {
-            // Second failure - create admin notification
-            logger.error("Research failed after retry - notifying admin", {
-              userId,
-              projectId: project.id,
-              retryAttempt: 2,
-            });
-
-            await createAdminNotification(
-              userId,
-              project,
-              project.lastError,
-              2
-            );
-
-            // Move to next scheduled time to avoid infinite retries
-            const nextRunAt = calculateNextRunAt(
-              project.frequency,
-              project.deliveryTime,
-              project.timezone
-              // Date.now()
-            );
-
-            await db
-              .collection("users")
-              .doc(userId)
-              .collection("projects")
-              .doc(project.id)
-              .update({
-                status: "error",
-                researchStartedAt: null,
-                lastRunAt: Date.now(),
-                nextRunAt,
-                updatedAt: Date.now(),
-              });
-          } else {
-            // First failure - just clear running status, will retry later
-            logger.warn("Research failed, will retry at delivery time", {
-              userId,
-              projectId: project.id,
-              isRetry,
-            });
-
-            await db
-              .collection("users")
-              .doc(userId)
-              .collection("projects")
-              .doc(project.id)
-              .update({
-                status: "active",
-                researchStartedAt: null,
-                updatedAt: Date.now(),
-              });
-          }
-        }
+        await executeResearchForProject(polledProject);
       } catch (error: any) {
         logger.error("Research execution error", {
-          userId,
-          projectId: project.id,
-          isRetry,
+          userId: polledProject.userId,
+          projectId: polledProject.project.id,
+          isRetry: polledProject.isRetry,
           error: error.message,
         });
       }
@@ -723,6 +716,7 @@ async function startScheduler(): Promise<void> {
 
   logger.info("Setting up cron job", { schedule: cronExpression });
 
+  // this can cause race conditions.
   cron.schedule(cronExpression, async () => {
     await runSchedulerJob();
   });

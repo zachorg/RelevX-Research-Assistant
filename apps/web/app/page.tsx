@@ -12,7 +12,6 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Navbar } from "@/components/navigation/navbar";
 import {
   Sparkles,
   Clock,
@@ -24,7 +23,8 @@ import {
 } from "lucide-react";
 
 export default function HomePage() {
-  const { loading } = useAuth();
+  const { loading, userProfile } = useAuth();
+  const router = useRouter();
 
   const handleSignIn = async () => {
     try {
@@ -128,18 +128,19 @@ export default function HomePage() {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Button
-              onClick={handleSignIn}
-              size="lg"
-              className="gap-2 text-lg px-8"
-            >
-              Get Started Free
-              <ArrowRight className="w-5 h-5" />
-            </Button>
+            {!userProfile && (
+              <Button
+                onClick={handleSignIn}
+                size="lg"
+                className="gap-2 text-lg px-8 hover:scale-105 transition-all duration-300 shadow-md hover:shadow-xl active:scale-95"
+              >
+                Get Started Free
+                <ArrowRight className="w-5 h-5" />
+              </Button>)}
             <Button
               variant="outline"
               size="lg"
-              className="gap-2 text-lg px-8"
+              className="gap-2 text-lg px-8 hover:scale-105 transition-all duration-300 shadow-md hover:shadow-xl active:scale-95"
               onClick={() => {
                 document.getElementById("features")?.scrollIntoView({
                   behavior: "smooth",
@@ -270,9 +271,16 @@ export default function HomePage() {
               </CardDescription>
               <div className="flex justify-center">
                 <Button
-                  onClick={handleSignIn}
+                  onClick={() => {
+                    if (!userProfile) {
+                      handleSignIn();
+                    }
+                    else {
+                      router.push("/projects");
+                    }
+                  }}
                   size="lg"
-                  className="gap-2 text-lg px-8"
+                  className="gap-2 text-lg px-8 hover:scale-105 transition-all duration-300 shadow-md hover:shadow-xl active:scale-95"
                 >
                   Start Researching Now
                   <ArrowRight className="w-5 h-5" />

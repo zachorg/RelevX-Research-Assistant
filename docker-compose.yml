@@ -17,7 +17,7 @@ services:
       - AWS_REGION=us-east-1 
       
       - NODE_ENV=production
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=info
 
       # Scheduler Configuration
       - SCHEDULER_ENABLED=true

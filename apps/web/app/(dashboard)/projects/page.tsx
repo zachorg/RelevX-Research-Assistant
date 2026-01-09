@@ -12,6 +12,29 @@ export default function ProjectsPage() {
   const { projects, loading } = useProjects();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
+  const sortedProjects = useMemo(() => {
+    return [...projects].sort((a, b) => {
+      // Priority 1: Active status (active or running)
+      const isActive = (status: string) => ["active", "running"].includes(status?.toLowerCase());
+
+      const aActive = isActive(a.status);
+      const bActive = isActive(b.status);
+
+      if (aActive && !bActive) return -1;
+      if (!aActive && bActive) return 1;
+
+      // Priority 2: Creation date (newest first)
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+
+      // Handle invalid dates safely
+      const validDateA = isNaN(dateA) ? 0 : dateA;
+      const validDateB = isNaN(dateB) ? 0 : dateB;
+
+      return validDateB - validDateA;
+    });
+  }, [projects]);
+
   const handleCreateProject = () => {
     setCreateDialogOpen(true);
   };
@@ -91,7 +114,7 @@ export default function ProjectsPage() {
           className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
         >
           <AnimatePresence mode="popLayout">
-            {projects.map((project, index) => (
+            {sortedProjects.map((project, index) => (
               <motion.div
                 key={project.title}
                 initial={{ opacity: 0, y: 20 }}
