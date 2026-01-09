@@ -124,7 +124,7 @@ export async function executeResearchForProject(
       !validateFrequency(/*project.frequency,*/ project.lastRunAt)
     ) {
       throw new Error(
-        `Project cannot be run more than once per day. Last run: ${new Date(
+        `E0001: Project cannot be run more than once per day. Last run: ${new Date(
           project.lastRunAt!
         ).toISOString()}`
       );
@@ -247,9 +247,13 @@ export async function executeResearchForProject(
       let preFilteredResults = uniqueResults;
 
       if (excludedKeywords.length > 0) {
-        preFilteredResults = preFilteredResults.filter(result => {
-          const contentText = `${result.title || ""} ${result.description || ""}`.toLowerCase();
-          return !excludedKeywords.some(keyword => contentText.includes(keyword.toLowerCase()));
+        preFilteredResults = preFilteredResults.filter((result) => {
+          const contentText = `${result.title || ""} ${
+            result.description || ""
+          }`.toLowerCase();
+          return !excludedKeywords.some((keyword) =>
+            contentText.includes(keyword.toLowerCase())
+          );
         });
       }
 
@@ -281,10 +285,10 @@ export async function executeResearchForProject(
 
       if (llmProvider.filterSearchResults && limitedResults.length > 0) {
         console.log("Filtering search results with LLM...");
-        const resultsForFilter = limitedResults.map(r => ({
+        const resultsForFilter = limitedResults.map((r) => ({
           url: r.url,
           title: r.title,
-          description: r.description
+          description: r.description,
         }));
 
         try {
@@ -294,13 +298,18 @@ export async function executeResearchForProject(
           );
 
           const urlsToKeep = new Set(
-            filtered.filter(f => f.keep).map(f => f.url)
+            filtered.filter((f) => f.keep).map((f) => f.url)
           );
 
-          resultsToFetch = limitedResults.filter(r => urlsToKeep.has(r.url));
-          console.log(`LLM filtered ${limitedResults.length} results down to ${resultsToFetch.length}`);
+          resultsToFetch = limitedResults.filter((r) => urlsToKeep.has(r.url));
+          console.log(
+            `LLM filtered ${limitedResults.length} results down to ${resultsToFetch.length}`
+          );
         } catch (err) {
-          console.warn("LLM filtering failed, proceeding with all results:", err);
+          console.warn(
+            "LLM filtering failed, proceeding with all results:",
+            err
+          );
         }
       }
 
@@ -331,13 +340,13 @@ export async function executeResearchForProject(
       // 7.4.5 Filter by keywords if specified
       let filteredContents = successfulContents;
 
-
       if (requiredKeywords.length > 0 || excludedKeywords.length > 0) {
         filteredContents = successfulContents.filter((content) => {
           // Check for excluded keywords first (case-insensitive)
           if (excludedKeywords.length > 0) {
-            const contentText = `${content.title || ""} ${content.snippet} ${content.fullContent || ""
-              }`.toLowerCase();
+            const contentText = `${content.title || ""} ${content.snippet} ${
+              content.fullContent || ""
+            }`.toLowerCase();
             const hasExcludedKeyword = excludedKeywords.some((keyword) =>
               contentText.includes(keyword.toLowerCase())
             );
@@ -348,8 +357,9 @@ export async function executeResearchForProject(
 
           // Check for required keywords (case-insensitive)
           if (requiredKeywords.length > 0) {
-            const contentText = `${content.title || ""} ${content.snippet} ${content.fullContent || ""
-              }`.toLowerCase();
+            const contentText = `${content.title || ""} ${content.snippet} ${
+              content.fullContent || ""
+            }`.toLowerCase();
             const hasRequiredKeyword = requiredKeywords.some((keyword) =>
               contentText.includes(keyword.toLowerCase())
             );
@@ -631,49 +641,4 @@ export async function executeResearchForProject(
       durationMs: Date.now() - startedAt,
     };
   }
-}
-
-/**
- * Execute research for multiple projects in batch
- */
-export async function executeResearchBatch(
-  projects: Array<{ userId: string; projectId: string }>,
-  options?: ResearchOptions
-): Promise<ResearchResult[]> {
-  const results: ResearchResult[] = [];
-
-  for (const { userId, projectId } of projects) {
-    try {
-      console.log(`\n=== Executing research for project ${projectId} ===`);
-      const result = await executeResearchForProject(
-        userId,
-        projectId,
-        options
-      );
-      results.push(result);
-    } catch (error: any) {
-      console.error(
-        `Failed to execute research for project ${projectId}:`,
-        error
-      );
-      results.push({
-        success: false,
-        projectId,
-        relevantResults: [],
-        totalResultsAnalyzed: 0,
-        iterationsUsed: 0,
-        queriesGenerated: [],
-        queriesExecuted: [],
-        urlsFetched: 0,
-        urlsSuccessful: 0,
-        urlsRelevant: 0,
-        error: error.message,
-        startedAt: Date.now(),
-        completedAt: Date.now(),
-        durationMs: 0,
-      });
-    }
-  }
-
-  return results;
 }

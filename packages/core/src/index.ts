@@ -100,7 +100,6 @@ export type {
 
 export {
   executeResearchForProject,
-  executeResearchBatch,
   setDefaultProviders,
 } from "./services/research-engine";
 export type {

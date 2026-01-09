@@ -167,26 +167,31 @@ async function executeProjectResearch(
       stack: error.stack,
     });
 
-    // Update project with error status
-    try {
-      const { db } = await import("core");
-      await db
-        .collection("users")
-        .doc(userId)
-        .collection("projects")
-        .doc(project.id)
-        .update({
-          status: "error",
-          lastError: error.message,
-          researchStartedAt: null,
-          updatedAt: Date.now(),
+    const errorCode = error.message.split(":")[0];
+
+    // E0001 is for daily limit exceeded -- that means we do not need to error out the project..
+    if (errorCode !== "E0001") {
+      // Update project with error status
+      try {
+        const { db } = await import("core");
+        await db
+          .collection("users")
+          .doc(userId)
+          .collection("projects")
+          .doc(project.id)
+          .update({
+            status: "error",
+            lastError: error.message,
+            researchStartedAt: null,
+            updatedAt: Date.now(),
+          });
+      } catch (updateError: any) {
+        logger.error("Failed to update project error status", {
+          userId,
+          projectId: project.id,
+          error: updateError.message,
         });
-    } catch (updateError: any) {
-      logger.error("Failed to update project error status", {
-        userId,
-        projectId: project.id,
-        error: updateError.message,
-      });
+      }
     }
 
     return null;

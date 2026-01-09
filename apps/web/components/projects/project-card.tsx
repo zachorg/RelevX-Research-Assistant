@@ -163,7 +163,10 @@ export function ProjectCard({ project }: ProjectCardProps) {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
                   className="gap-2"
-                  onClick={() => setSettingsDialogOpen(true)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSettingsDialogOpen(true);
+                  }}
                 >
                   <Settings className="w-4 h-4" />
                   Settings
@@ -171,7 +174,10 @@ export function ProjectCard({ project }: ProjectCardProps) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="gap-2 text-destructive focus:text-destructive"
-                  onClick={() => setDeleteDialogOpen(true)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteDialogOpen(true);
+                  }}
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete

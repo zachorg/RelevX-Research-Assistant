@@ -26,6 +26,23 @@ const app = Fastify({
       paths: ["destination", "body.destination", "req.body.destination"],
       censor: "[REDACTED]",
     },
+    serializers: {
+      req(request) {
+        const MAX_URL_LENGTH = 50; // Set your desired limit
+        const url = request.url;
+
+        return {
+          method: request.method,
+          // Truncate the URL if it's too long
+          url:
+            url.length > MAX_URL_LENGTH
+              ? url.substring(0, MAX_URL_LENGTH) + "..."
+              : url,
+          hostname: request.hostname,
+          remoteAddress: request.ip,
+        };
+      },
+    },
   },
   bodyLimit: 1048576,
 });

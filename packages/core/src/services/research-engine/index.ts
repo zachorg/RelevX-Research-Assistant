@@ -12,11 +12,7 @@
  * Now supports pluggable providers for LLM and Search services.
  */
 
-export {
-  executeResearchForProject,
-  executeResearchBatch,
-  setDefaultProviders,
-} from "./orchestrator";
+export { executeResearchForProject, setDefaultProviders } from "./orchestrator";
 export { getSearchHistory, updateSearchHistory } from "./search-history";
 export { saveSearchResults, saveDeliveryLog } from "./result-storage";
 export type { ResearchOptions, ResearchResult } from "./types";

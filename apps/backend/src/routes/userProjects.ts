@@ -20,6 +20,7 @@ import { Redis } from "ioredis";
 
 const REDIS_EXPIRE_TIME_IN_SECONDS = 60 * 5;
 const listeners = new Map<string, () => void>();
+const connections = new Map<string, any>();
 
 // 1. Create a dedicated subscriber connection
 // We don't use the main fastify.redis because it's busy with GET/SET
@@ -121,6 +122,10 @@ const routes: FastifyPluginAsync = async (app) => {
 
   // Secure project subscription via WebSockets
   app.get("/subscribe", { websocket: true }, (connection, req: any) => {
+    const onConnectedClosed = async (userId: string) => {
+      connections.delete(userId);
+      await app.redis.expire(userId, REDIS_EXPIRE_TIME_IN_SECONDS);
+    };
     try {
       // Manually authenticate since preHandler doesn't run for websockets
       const idToken = req.query?.["token"] as string;
@@ -134,6 +139,7 @@ const routes: FastifyPluginAsync = async (app) => {
           }
           const userId = res.user.uid;
           connection.send(JSON.stringify({ connected: true }));
+          connections.set(userId, connection);
 
           // check redis to see if user has cached data
           let valid = await app.redis.get(userId);
@@ -143,7 +149,8 @@ const routes: FastifyPluginAsync = async (app) => {
             // retrieve again for safe-fail
             valid = await app.redis.get(userId);
             if (valid) {
-              // Send the deduplicated array of values
+              app.log.info("Sending cached projects to user " + userId);
+              // Send the cached value
               connection?.send(
                 JSON.stringify({
                   projects: JSON.parse(valid),
@@ -153,7 +160,7 @@ const routes: FastifyPluginAsync = async (app) => {
           }
 
           if (!valid) {
-            // set redis key
+            // set redis key -- cache the value
             const projectSnapshot = await db
               .collection("users")
               .doc(userId)
@@ -166,16 +173,11 @@ const routes: FastifyPluginAsync = async (app) => {
                 ...data,
               };
             });
-            // sort projects on client side
-            // projects.sort((a: any, b: any) => {
-            //   return (
-            //     b.createdAt - a.createdAt ||
-            //     (b.status === "active" ? 1 : 0) -
-            //       (a.status === "active" ? 1 : 0)
-            //   );
-            // });
             await app.redis.set(userId, JSON.stringify(projects));
+          }
 
+          if (!listeners.has(userId)) {
+            app.log.info("Setting up listener for user " + userId);
             // Set up Firestore listener
             const unsubscribe = db
               .collection("users")
@@ -202,17 +204,13 @@ const routes: FastifyPluginAsync = async (app) => {
                       ...data,
                     };
                   });
-                  // sort projects on client side
-                  // projects.sort((a: any, b: any) => {
-                  //   return (
-                  //     b.createdAt - a.createdAt ||
-                  //     (b.status === "active" ? 1 : 0) -
-                  //       (a.status === "active" ? 1 : 0)
-                  //   );
-                  // });
 
                   const uniqueProjects = new Map<string, any>();
                   cachedProjects.forEach((project: any) => {
+                    // Use a Map to store the key (title) and value (project object)
+                    uniqueProjects.set(project.title, project);
+                  });
+                  projects.forEach((project: any) => {
                     // Use a Map to store the key (title) and value (project object)
                     uniqueProjects.set(project.title, project);
                   });
@@ -221,7 +219,8 @@ const routes: FastifyPluginAsync = async (app) => {
                     userId,
                     JSON.stringify(Array.from(uniqueProjects.values()))
                   );
-                  connection?.send(
+
+                  connections.get(userId)?.send(
                     JSON.stringify({
                       projects,
                     })
@@ -229,9 +228,9 @@ const routes: FastifyPluginAsync = async (app) => {
                 },
                 (err: any) => {
                   app.log.error(err, "Firestore onSnapshot error");
-                  connection?.send(
-                    JSON.stringify({ error: "Internal server error" })
-                  );
+                  connections
+                    .get(userId)
+                    ?.send(JSON.stringify({ error: "Internal server error" }));
                 }
               );
             listeners.set(userId, unsubscribe);
@@ -239,24 +238,18 @@ const routes: FastifyPluginAsync = async (app) => {
 
           connection?.on("close", async () => {
             console.log("WebSocket closed");
-            await app.redis.expire(userId, REDIS_EXPIRE_TIME_IN_SECONDS);
+            onConnectedClosed(userId);
           });
         })
         .catch((err) => {
           app.log.error(err, "WebSocket auth failed");
-          if (connection) {
-            connection?.send(
-              JSON.stringify({ error: "Authentication failed" })
-            );
-            connection?.close();
-          }
+          connection?.send(JSON.stringify({ error: "Authentication failed" }));
+          connection?.close();
         });
     } catch (error) {
       app.log.error(error, "WebSocket setup failed");
-      if (connection) {
-        connection?.send(JSON.stringify({ error: "Internal server error" }));
-        connection?.close();
-      }
+      connection?.send(JSON.stringify({ error: "Internal server error" }));
+      connection?.close();
     }
   });
 
