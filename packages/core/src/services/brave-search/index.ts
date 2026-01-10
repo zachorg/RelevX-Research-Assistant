@@ -20,4 +20,5 @@ export type {
   SearchFilters,
   BraveSearchResult,
   BraveSearchResponse,
+  BraveFreshness,
 } from "./types";

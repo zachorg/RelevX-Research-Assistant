@@ -59,32 +59,67 @@ function getDefaultProviders(): { llm: LLMProvider; search: SearchProvider } {
 }
 
 /**
- * Calculate date range based on project frequency
+ * Freshness values for Brave Search API
+ * pd = past day (24 hours)
+ * pw = past week (7 days)
+ * pm = past month (31 days)
+ * py = past year (365 days)
  */
-function calculateDateRange(frequency: "daily" | "weekly" | "monthly"): {
-  dateFrom: string;
-  dateTo: string;
-} {
-  const now = new Date();
-  const dateTo = now.toISOString().split("T")[0]; // Today
+type Freshness = "pd" | "pw" | "pm" | "py";
 
-  let dateFrom: Date;
+/**
+ * Get the initial freshness value based on project frequency
+ * - Daily projects: search past 24 hours (pd)
+ * - Weekly projects: search past week (pw)
+ * - Monthly projects: search past month (pm)
+ */
+function getFreshnessForFrequency(
+  frequency: "daily" | "weekly" | "monthly"
+): Freshness {
   switch (frequency) {
     case "daily":
-      dateFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      break;
+      return "pd"; // Past day
     case "weekly":
-      dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      break;
+      return "pw"; // Past week
     case "monthly":
-      dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      break;
+      return "pm"; // Past month
   }
+}
 
-  return {
-    dateFrom: dateFrom.toISOString().split("T")[0],
-    dateTo,
-  };
+/**
+ * Get the fallback (expanded) freshness value when not enough results are found
+ * - pd (past day) -> pw (past week)
+ * - pw (past week) -> pm (past month)
+ * - pm (past month) -> py (past year)
+ * - py (past year) -> undefined (no further expansion)
+ */
+function getFallbackFreshness(currentFreshness: Freshness): Freshness | undefined {
+  switch (currentFreshness) {
+    case "pd":
+      return "pw"; // Expand from day to week
+    case "pw":
+      return "pm"; // Expand from week to month
+    case "pm":
+      return "py"; // Expand from month to year
+    case "py":
+      return undefined; // No further expansion possible
+  }
+}
+
+/**
+ * Get human-readable description of freshness value
+ */
+function describeFreshness(freshness: Freshness): string {
+  switch (freshness) {
+    case "pd":
+      return "past 24 hours";
+    case "pw":
+      return "past week";
+    case "pm":
+      return "past month";
+    case "py":
+      return "past year";
+  }
 }
 
 /**
@@ -143,20 +178,20 @@ export async function executeResearchForProject(
       history.processedUrls.map((u) => u.normalizedUrl)
     );
 
-    // 5. Prepare search filters
-    const dateRange = project.searchParameters?.dateRangePreference
-      ? calculateDateRange(project.frequency)
-      : undefined;
-
-    const searchFilters: SearchFilters = {
+    // 5. Prepare base search filters (freshness will be set per iteration)
+    const baseSearchFilters: Omit<SearchFilters, "freshness"> = {
       country: project.searchParameters?.region,
       language: project.searchParameters?.language,
       includeDomains: project.searchParameters?.priorityDomains,
       excludeDomains: project.searchParameters?.excludedDomains,
-      dateFrom: dateRange?.dateFrom,
-      dateTo: dateRange?.dateTo,
       count: 5, // Limit results per query to save tokens/API calls
     };
+
+    // 5.1 Determine initial freshness based on project frequency
+    let currentFreshness: Freshness = getFreshnessForFrequency(project.frequency);
+    console.log(
+      `Initial freshness for ${project.frequency} project: ${currentFreshness} (${describeFreshness(currentFreshness)})`
+    );
 
     // 6. Tracking
     let allRelevantResults: SearchResult[] = [];
@@ -169,11 +204,15 @@ export async function executeResearchForProject(
       { relevant: number; total: number }
     >();
 
+    // Track if we've already expanded freshness in this run
+    let freshnessExpanded = false;
+
     // 7. Iteration loop (max 3 times)
     let iteration = 1;
 
     while (iteration <= maxIterations) {
       console.log(`\n=== Research Iteration ${iteration}/${maxIterations} ===`);
+      console.log(`Using freshness: ${currentFreshness} (${describeFreshness(currentFreshness)})`);
 
       // 7.1 Generate search queries
       console.log("Generating search queries...");
@@ -204,8 +243,12 @@ export async function executeResearchForProject(
       allQueriesGenerated.push(...queries);
       console.log(`Generated ${queries.length} queries`);
 
-      // 7.2 Execute searches
+      // 7.2 Execute searches with current freshness setting
       console.log("Executing searches...");
+      const searchFilters: SearchFilters = {
+        ...baseSearchFilters,
+        freshness: currentFreshness,
+      };
       const searchResponses = await searchProvider.searchMultiple(
         queries,
         searchFilters
@@ -484,6 +527,23 @@ export async function executeResearchForProject(
       console.log(
         `Only ${allRelevantResults.length}/${minResults} results found, continuing...`
       );
+
+      // 7.10 Expand freshness if not enough results and we haven't expanded yet
+      if (!freshnessExpanded && allRelevantResults.length < minResults) {
+        const fallbackFreshness = getFallbackFreshness(currentFreshness);
+        if (fallbackFreshness) {
+          console.log(
+            `Not enough results with ${describeFreshness(currentFreshness)}, expanding to ${describeFreshness(fallbackFreshness)}`
+          );
+          currentFreshness = fallbackFreshness;
+          freshnessExpanded = true;
+        } else {
+          console.log(
+            `Already at maximum freshness range (${describeFreshness(currentFreshness)}), cannot expand further`
+          );
+        }
+      }
+
       iteration++;
     }
 

@@ -85,26 +85,29 @@ export async function searchWeb(
     params.append("safesearch", filters.safesearch);
   }
 
-  // Add date filters using freshness parameter
-  if (filters?.dateFrom || filters?.dateTo) {
-    // Brave uses "freshness" parameter with values like "pd" (past day), "pw" (past week), etc.
-    // For custom date ranges, we'll calculate relative time
-    if (filters.dateFrom) {
-      const fromDate = new Date(filters.dateFrom);
-      const now = new Date();
-      const daysDiff = Math.floor(
-        (now.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)
-      );
+  // Add freshness filter - prioritize explicit freshness parameter
+  if (filters?.freshness) {
+    // Use the freshness parameter directly (pd, pw, pm, py, or custom date range)
+    params.append("freshness", filters.freshness);
+  } else if (filters?.dateFrom && filters?.dateTo) {
+    // Use custom date range format: YYYY-MM-DDtoYYYY-MM-DD
+    params.append("freshness", `${filters.dateFrom}to${filters.dateTo}`);
+  } else if (filters?.dateFrom) {
+    // Calculate relative freshness from dateFrom
+    const fromDate = new Date(filters.dateFrom);
+    const now = new Date();
+    const daysDiff = Math.floor(
+      (now.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
 
-      if (daysDiff <= 1) {
-        params.append("freshness", "pd"); // Past day
-      } else if (daysDiff <= 7) {
-        params.append("freshness", "pw"); // Past week
-      } else if (daysDiff <= 30) {
-        params.append("freshness", "pm"); // Past month
-      } else if (daysDiff <= 365) {
-        params.append("freshness", "py"); // Past year
-      }
+    if (daysDiff <= 1) {
+      params.append("freshness", "pd"); // Past day
+    } else if (daysDiff <= 7) {
+      params.append("freshness", "pw"); // Past week
+    } else if (daysDiff <= 30) {
+      params.append("freshness", "pm"); // Past month
+    } else if (daysDiff <= 365) {
+      params.append("freshness", "py"); // Past year
     }
   }
 
