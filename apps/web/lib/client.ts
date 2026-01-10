@@ -46,11 +46,11 @@ export async function relevx_api_fetch<T>(
     headers: {
       ...(init?.headers || {}),
       "content-type": "application/json",
-      authorization: `Bearer ${idToken}`
+      authorization: `Bearer ${idToken}`,
     },
     cache: "no-store",
   };
-  // console.log("🔑 request: ", JSON.stringify(req, null, 2));
+  console.log("🔑 request: ", JSON.stringify(req, null, 2));
   const res = await foward_req_to_relevx_api(reqPath, req);
   const text = await res.text();
   let data: unknown = undefined;
@@ -73,22 +73,14 @@ export const relevx_api = {
   get<T>(path: string, headers?: HeaderMap): Promise<T> {
     return relevx_api_fetch<T>(path, { method: "GET", headers });
   },
-  post<T>(
-    path: string,
-    body?: Json,
-    headers?: HeaderMap
-  ): Promise<T> {
+  post<T>(path: string, body?: Json, headers?: HeaderMap): Promise<T> {
     return relevx_api_fetch<T>(path, {
       method: "POST",
       body: JSON.stringify(body ?? {}),
       headers,
     });
   },
-  delete<T>(
-    path: string,
-    body?: Json,
-    headers?: HeaderMap
-  ): Promise<T> {
+  delete<T>(path: string, body?: Json, headers?: HeaderMap): Promise<T> {
     // Next.js route supports DELETE with a JSON body
     return relevx_api_fetch<T>(path, {
       method: "DELETE",

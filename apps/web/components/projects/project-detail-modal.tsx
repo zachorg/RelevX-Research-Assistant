@@ -22,8 +22,9 @@ import {
 } from "lucide-react";
 import { useDeliveryLogs } from "@/hooks/use-delivery-logs";
 import { EditProjectSettingsDialog } from "./edit-project-settings-dialog";
+import ReactMarkdown from "react-markdown";
 
-type TabId = "overview" | "settings" | "history";
+type TabId = "overview" | "history";
 
 interface ProjectDetailModalProps {
   project: ProjectInfo;
@@ -44,11 +45,6 @@ export function ProjectDetailModal({
       id: "overview",
       label: "Overview",
       icon: <LayoutDashboard className="w-4 h-4" />,
-    },
-    {
-      id: "settings",
-      label: "Settings",
-      icon: <Settings className="w-4 h-4" />,
     },
     {
       id: "history",
@@ -91,32 +87,36 @@ export function ProjectDetailModal({
           </div>
 
           {/* Tab Navigation */}
-          <div className="flex border-b border-border/50 px-6">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
+          <div className="flex items-center justify-between border-b border-border/50 px-6">
+            <div className="flex">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 rounded-t-lg transition-all duration-200 ${activeTab === tab.id
+                    ? "border-primary text-primary bg-primary/5"
+                    : "border-transparent text-muted-foreground hover:border-border hover:bg-accent hover:text-accent-foreground"
+                    }`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground transition-all duration-300 hover:rotate-90"
+              onClick={() => setSettingsDialogOpen(true)}
+            >
+              <Settings className="w-4 h-4" />
+            </Button>
           </div>
 
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto p-6">
             {activeTab === "overview" && <OverviewTab project={project} />}
-            {activeTab === "settings" && (
-              <SettingsTab
-                project={project}
-                onEditClick={() => setSettingsDialogOpen(true)}
-              />
-            )}
+
             {activeTab === "history" && (
               <DeliveryHistoryTab projectTitle={project.title} />
             )}
@@ -236,63 +236,7 @@ function OverviewTab({ project }: { project: ProjectInfo }) {
   );
 }
 
-// Settings Tab Component
-function SettingsTab({
-  project,
-  onEditClick,
-}: {
-  project: ProjectInfo;
-  onEditClick: () => void;
-}) {
-  const arrayToDisplay = (arr: string[] | undefined): string => {
-    return arr && arr.length > 0 ? arr.join(", ") : "None configured";
-  };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Project Settings</h3>
-        <Button onClick={onEditClick}>
-          <Settings className="w-4 h-4 mr-2" />
-          Edit Settings
-        </Button>
-      </div>
-
-      <div className="grid gap-4">
-        {/* Search Parameters */}
-        <div className="p-4 rounded-lg border border-border/50">
-          <h4 className="font-medium mb-3">Search Parameters</h4>
-          <div className="grid gap-3 text-sm">
-            <div>
-              <span className="text-muted-foreground">Priority Domains:</span>
-              <p className="mt-1">
-                {arrayToDisplay(project.searchParameters?.priorityDomains)}
-              </p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Excluded Domains:</span>
-              <p className="mt-1">
-                {arrayToDisplay(project.searchParameters?.excludedDomains)}
-              </p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Required Keywords:</span>
-              <p className="mt-1">
-                {arrayToDisplay(project.searchParameters?.requiredKeywords)}
-              </p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Excluded Keywords:</span>
-              <p className="mt-1">
-                {arrayToDisplay(project.searchParameters?.excludedKeywords)}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // Delivery History Tab Component
 function DeliveryHistoryTab({ projectTitle }: { projectTitle: string }) {
@@ -411,13 +355,12 @@ function DeliveryHistoryTab({ projectTitle }: { projectTitle: string }) {
               </div>
               <div className="flex items-center gap-3">
                 <span
-                  className={`text-xs px-2 py-1 rounded-full ${
-                    log.status === "success"
-                      ? "bg-green-500/10 text-green-500"
-                      : log.status === "failed"
+                  className={`text-xs px-2 py-1 rounded-full ${log.status === "success"
+                    ? "bg-green-500/10 text-green-500"
+                    : log.status === "failed"
                       ? "bg-red-500/10 text-red-500"
                       : "bg-yellow-500/10 text-yellow-500"
-                  }`}
+                    }`}
                 >
                   {getStatusLabel(log.status)}
                 </span>
@@ -455,9 +398,7 @@ function DeliveryHistoryTab({ projectTitle }: { projectTitle: string }) {
                     <h4 className="text-sm font-medium mb-2">Report</h4>
                     <div className="max-h-[400px] overflow-y-auto p-4 rounded-lg bg-background border border-border/50">
                       <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <pre className="whitespace-pre-wrap text-sm font-sans">
-                          {log.reportMarkdown}
-                        </pre>
+                        <ReactMarkdown>{log.reportMarkdown}</ReactMarkdown>
                       </div>
                     </div>
                   </div>

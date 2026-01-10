@@ -11,6 +11,7 @@
 import * as dotenv from "dotenv";
 import * as cron from "node-cron";
 import { logger } from "./logger";
+import { Filter } from "firebase-admin/firestore";
 import { loadAwsSecrets } from "./plugins/aws";
 
 // Load environment variables
@@ -268,7 +269,13 @@ async function runResearchJob(): Promise<void> {
         .collection("users")
         .doc(userId)
         .collection("projects")
-        .where("status", "==", "active")
+        // active and projects with error need to be taken care off.
+        .where(
+          Filter.or(
+            Filter.where("status", "==", "active"),
+            Filter.where("status", "==", "error")
+          )
+        )
         .where("nextRunAt", ">", now)
         .where("nextRunAt", "<=", prerunMaxTime)
         .get();
@@ -295,7 +302,12 @@ async function runResearchJob(): Promise<void> {
         .collection("users")
         .doc(userId)
         .collection("projects")
-        .where("status", "==", "active")
+        .where(
+          Filter.or(
+            Filter.where("status", "==", "active"),
+            Filter.where("status", "==", "error")
+          )
+        )
         .where("nextRunAt", "<=", now)
         .get();
 

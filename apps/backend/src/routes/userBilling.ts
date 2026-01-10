@@ -1,18 +1,18 @@
 import type { FastifyPluginAsync } from "fastify";
-import type Stripe from "stripe";
 import type {
   BillingPortalLinkResponse,
   BillingPaymentLinkResponse,
   RelevxUserProfile,
-  Plan,
 } from "core";
+import { getPlans } from "./products.js";
 
 // API key management routes: create/list/revoke. All routes rely on the auth
 // plugin to populate req.userId and tenant authorization.
 const routes: FastifyPluginAsync = async (app) => {
   const firebase = app.firebase;
   const db = firebase.db;
-  const stripe = app.stripe as Stripe;
+  const stripe = app.stripe;
+  const remoteConfig = firebase.remoteConfig;
 
   app.get("/healthz", async (_req, rep) => {
     return rep.send({ ok: true });
@@ -25,17 +25,20 @@ const routes: FastifyPluginAsync = async (app) => {
       try {
         const userId = req.user?.uid;
         if (!userId) {
-          return rep.status(401).send({ error: { message: "Unauthenticated" } });
+          return rep
+            .status(401)
+            .send({ error: { message: "Unauthenticated" } });
         }
         const planId = (req.headers as any).planId;
         if (!planId) {
-          return rep.status(400).send({ error: { message: "Plan ID is required" } });
+          return rep
+            .status(400)
+            .send({ error: { message: "Plan ID is required" } });
         }
-        const planDoc = await db.collection("plans").doc(planId).get();
-        if (!planDoc.exists) {
-          return rep.status(404).send({ error: { message: "Plan not found" } });
-        }
-        const planData = planDoc.data() as Plan;
+
+        const planData = (await getPlans(remoteConfig)).find(
+          (p) => p.id === planId
+        );
         if (!planData) {
           return rep.status(404).send({ error: { message: "Plan not found" } });
         }
@@ -56,15 +59,33 @@ const routes: FastifyPluginAsync = async (app) => {
           status: "active",
         });
 
-        active_subscriptions.data = active_subscriptions.data.filter((s) => s.items.data.some((i) => i.price.id !== "price_1SdeOZ2HZ4FTsWfQlJwnnqM9"));
+        active_subscriptions.data = active_subscriptions.data.filter((s) =>
+          s.items.data.some(
+            (i) => i.price.id !== "price_1SdeOZ2HZ4FTsWfQlJwnnqM9"
+          )
+        );
 
-        const hasActiveSubscription = active_subscriptions.data.find((s) => s.id === planData.infoStripeSubscriptionId) !== undefined;
+        const hasActiveSubscription =
+          active_subscriptions.data.find(
+            (s) => s.id === planData.infoStripeSubscriptionId
+          ) !== undefined;
         if (hasActiveSubscription) {
-          return rep.status(404).send({ errorCode: "plan_already_active", error: { message: "User already has an active subscription to this plan" } });
+          return rep.status(404).send({
+            errorCode: "plan_already_active",
+            error: {
+              message: "User already has an active subscription to this plan",
+            },
+          });
         }
 
         if (active_subscriptions.data.length > 0) {
-          return rep.status(404).send({ errorCode: "plan_already_active", error: { message: "User already has an active subscription plan. Please unsubscribe to current to start a new plan." } });
+          return rep.status(404).send({
+            errorCode: "plan_already_active",
+            error: {
+              message:
+                "User already has an active subscription plan. Please unsubscribe to current to start a new plan.",
+            },
+          });
         }
 
         let sessionUrl = null;
@@ -100,13 +121,12 @@ const routes: FastifyPluginAsync = async (app) => {
           });
 
           if (!session) {
-            return rep
-              .status(500)
-              .send({ error: { message: "Failed to create checkout session" } });
+            return rep.status(500).send({
+              error: { message: "Failed to create checkout session" },
+            });
           }
           sessionUrl = session.url;
-        }
-        else {
+        } else {
           const session = await stripe.checkout.sessions.create({
             mode: "subscription",
             customer: userData.billing.stripeCustomerId,
@@ -125,9 +145,9 @@ const routes: FastifyPluginAsync = async (app) => {
           });
 
           if (!session) {
-            return rep
-              .status(500)
-              .send({ error: { message: "Failed to create checkout session" } });
+            return rep.status(500).send({
+              error: { message: "Failed to create checkout session" },
+            });
           }
           sessionUrl = session.url;
         }
@@ -173,7 +193,9 @@ const routes: FastifyPluginAsync = async (app) => {
 
         const userData = userDoc.data() as RelevxUserProfile;
         if (!userData.billing.stripeCustomerId) {
-          return rep.status(400).send({ error: { message: "User is not a stripe customer" } });
+          return rep
+            .status(400)
+            .send({ error: { message: "User is not a stripe customer" } });
         }
 
         const session = await stripe.billingPortal.sessions.create({

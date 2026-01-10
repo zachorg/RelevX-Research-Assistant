@@ -17,23 +17,15 @@ import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { isUserSubscribed } from "../utils/billing.js";
 import { getUserData } from "../utils/user.js";
 import { Redis } from "ioredis";
+import { getRemoteConfigParam } from "./products.js";
 
-const REDIS_EXPIRE_TIME_IN_SECONDS = 60 * 5;
 const listeners = new Map<string, () => void>();
-const connections = new Map<string, any>();
 
 // 1. Create a dedicated subscriber connection
 // We don't use the main fastify.redis because it's busy with GET/SET
 const subscriber = new Redis(process.env.REDIS_URL || "");
 
 subscriber.on("error", (err) => console.log("Redis Client Error", err));
-
-// 2. Enable Notifications (Safety check)
-// This ensures the Docker container is actually emitting events
-await subscriber.config("SET", "notify-keyspace-events", "Ex");
-
-// 3. Subscribe to the expiration channel
-await subscriber.subscribe("__keyevent@0__:expired");
 
 /**
  * Add one frequency period to a date
@@ -103,29 +95,50 @@ function calculateNextRunAt(
 const routes: FastifyPluginAsync = async (app) => {
   const firebase = app.firebase;
   const db = firebase.db;
+  const remoteConfig = firebase.remoteConfig;
 
   app.get("/healthz", async (_req, rep) => {
     return rep.send({ ok: true });
   });
 
-  // 4. Handle the event
-  subscriber.on("message", async (_channel: any, key: any) => {
-    console.log(`Redis: Item with key "${key}" has expired!`);
-    const unsubscribe = listeners.get(key);
-    unsubscribe?.();
-    listeners.delete(key);
-  });
-
-  app.addHook("onClose", async () => {
-    await subscriber.quit();
-  });
+  app.addHook("onClose", async () => {});
 
   // Secure project subscription via WebSockets
   app.get("/subscribe", { websocket: true }, (connection, req: any) => {
     const onConnectedClosed = async (userId: string) => {
-      connections.delete(userId);
-      await app.redis.expire(userId, REDIS_EXPIRE_TIME_IN_SECONDS);
+      const unsubscribe = listeners.get(userId);
+      unsubscribe?.();
+      listeners.delete(userId);
+      await app.redis.del(userId);
     };
+
+    // const warmUserProjectsCache = async (userId: string) => {
+    //   // set redis key -- cache the value
+    //   const projectSnapshot = await db
+    //     .collection("users")
+    //     .doc(userId)
+    //     .collection("projects")
+    //     .where("status", "!=", "deleted")
+    //     .get();
+
+    //   const initialProjectsCache = await projectSnapshot.docs.map(
+    //     (doc: any) => {
+    //       const { userId: _userId, id: _id, ...data } = doc.data();
+    //       return {
+    //         ...data,
+    //       };
+    //     }
+    //   );
+    //   await app.redis.set(userId, JSON.stringify(initialProjectsCache));
+    //   return initialProjectsCache.filter(
+    //     (project: any) => project.status !== "deleted"
+    //   );
+    // };
+
+    if (!connection) {
+      req.reply.status(500).send({ error: "Connection failed" });
+      return;
+    }
     try {
       // Manually authenticate since preHandler doesn't run for websockets
       const idToken = req.query?.["token"] as string;
@@ -139,117 +152,62 @@ const routes: FastifyPluginAsync = async (app) => {
           }
           const userId = res.user.uid;
           connection.send(JSON.stringify({ connected: true }));
-          connections.set(userId, connection);
 
-          // check redis to see if user has cached data
-          let valid = await app.redis.get(userId);
-          if (valid) {
-            await app.redis.persist(userId);
-
-            // retrieve again for safe-fail
-            valid = await app.redis.get(userId);
-            if (valid) {
-              app.log.info("Sending cached projects to user " + userId);
-              // Send the cached value
-              connection?.send(
-                JSON.stringify({
-                  projects: JSON.parse(valid),
-                })
-              );
-            }
+          // sanity check -- safe
+          if (listeners.has(userId)) {
+            await onConnectedClosed(userId);
           }
 
-          if (!valid) {
-            // set redis key -- cache the value
-            const projectSnapshot = await db
-              .collection("users")
-              .doc(userId)
-              .collection("projects")
-              .get();
+          // const projects = await warmUserProjectsCache(userId);
+          // connection.send(JSON.stringify({ projects }));
 
-            const projects = projectSnapshot.docs.map((doc: any) => {
-              const { userId: _userId, id: _id, ...data } = doc.data();
-              return {
-                ...data,
-              };
-            });
-            await app.redis.set(userId, JSON.stringify(projects));
-          }
+          app.log.info("Setting up listener for user " + userId);
+          // Set up Firestore listener
+          const unsubscribe = await db
+            .collection("users")
+            .doc(userId)
+            .collection("projects")
+            .onSnapshot(
+              async (snapshot: any) => {
+                // get projects from snapshot
+                let projects = snapshot.docs.map((doc: any) => {
+                  const { userId: _userId, id: _id, ...data } = doc.data();
+                  return {
+                    ...data,
+                  };
+                });
 
-          if (!listeners.has(userId)) {
-            app.log.info("Setting up listener for user " + userId);
-            // Set up Firestore listener
-            const unsubscribe = db
-              .collection("users")
-              .doc(userId)
-              .collection("projects")
-              .onSnapshot(
-                async (snapshot: any) => {
-                  const cachedProjectString = await app.redis.get(userId);
-                  if (!cachedProjectString) {
-                    // projects
-                    app.log.error(
-                      "Redis key has not yet been set before setting up listener for user " +
-                        userId
-                    );
-                    return;
-                  }
-                  const cachedProjects: ProjectInfo[] =
-                    JSON.parse(cachedProjectString);
+                projects = projects.filter(
+                  (project: any) => project.status !== "deleted"
+                );
 
-                  // get projects from snapshot
-                  const projects = snapshot.docs.map((doc: any) => {
-                    const { userId: _userId, id: _id, ...data } = doc.data();
-                    return {
-                      ...data,
-                    };
-                  });
+                // set cache
+                await app.redis.set(userId, JSON.stringify(projects));
+                connection.send(JSON.stringify({ projects }));
+              },
+              (err: any) => {
+                app.log.error(err, "Firestore onSnapshot error");
+                connection.send(
+                  JSON.stringify({ error: "Internal server error" })
+                );
+              }
+            );
+          listeners.set(userId, unsubscribe);
 
-                  const uniqueProjects = new Map<string, any>();
-                  cachedProjects.forEach((project: any) => {
-                    // Use a Map to store the key (title) and value (project object)
-                    uniqueProjects.set(project.title, project);
-                  });
-                  projects.forEach((project: any) => {
-                    // Use a Map to store the key (title) and value (project object)
-                    uniqueProjects.set(project.title, project);
-                  });
-
-                  await app.redis.set(
-                    userId,
-                    JSON.stringify(Array.from(uniqueProjects.values()))
-                  );
-
-                  connections.get(userId)?.send(
-                    JSON.stringify({
-                      projects,
-                    })
-                  );
-                },
-                (err: any) => {
-                  app.log.error(err, "Firestore onSnapshot error");
-                  connections
-                    .get(userId)
-                    ?.send(JSON.stringify({ error: "Internal server error" }));
-                }
-              );
-            listeners.set(userId, unsubscribe);
-          }
-
-          connection?.on("close", async () => {
+          connection.on("close", async () => {
             console.log("WebSocket closed");
-            onConnectedClosed(userId);
+            await onConnectedClosed(userId);
           });
         })
         .catch((err) => {
           app.log.error(err, "WebSocket auth failed");
-          connection?.send(JSON.stringify({ error: "Authentication failed" }));
-          connection?.close();
+          connection.send(JSON.stringify({ error: "Authentication failed" }));
+          connection.close();
         });
     } catch (error) {
       app.log.error(error, "WebSocket setup failed");
-      connection?.send(JSON.stringify({ error: "Internal server error" }));
-      connection?.close();
+      connection.send(JSON.stringify({ error: "Internal server error" }));
+      connection.close();
     }
   });
 
@@ -564,7 +522,12 @@ const routes: FastifyPluginAsync = async (app) => {
             .status(404)
             .send({ error: { message: "Project not found" } });
 
-        await doc.ref.delete();
+        // update cache after deletion
+        await doc.ref.update({
+          status: "deleted",
+          updatedAt: new Date().toISOString(),
+        });
+
         return rep.status(200).send({ ok: true });
       } catch (err: any) {
         req.log?.error(err, "/user/projects/delete failed");
@@ -629,23 +592,43 @@ const routes: FastifyPluginAsync = async (app) => {
               nStatus = status;
             }
             if (docs) {
-              const plansRef = db.collection("plans").doc(userData.user.planId);
-              const plansDoc = await plansRef.get();
-              const plansData = plansDoc.data() as Plan;
+              const config = await getRemoteConfigParam(remoteConfig, "plans");
+              const plansRaw = config?.defaultValue?.value;
 
-              // Go through all the projects in 'docs' and count the max number of daily runs happening in a 30-Day period
-              let totalDailyRuns = 0;
-              docs.forEach((doc) => {
-                const data: Project = doc.data() as Project;
-                if (data.frequency === "daily") totalDailyRuns++;
-              });
-              const maxDailyRuns = plansData.settingsMaxDailyRuns;
-              if (totalDailyRuns >= maxDailyRuns) {
-                errorCode = "max_daily_runs";
-                errorMessage =
-                  "User has reached the maximum number of daily runs. Please subscribe to a higher plan, if available.";
+              let plansData = null;
+              if (plansRaw) {
+                const parsed = JSON.parse(plansRaw);
+                const plansArray: Plan[] = Array.isArray(parsed)
+                  ? parsed
+                  : Object.values(parsed);
+
+                if (!Array.isArray(plansArray)) {
+                  throw new Error(
+                    "Parsed plans is not an array or valid object"
+                  );
+                }
+
+                plansData = plansArray.find(
+                  (plan) => plan.id === userData.user.planId
+                );
+              }
+              if (plansData) {
+                // Go through all the projects in 'docs' and count the max number of daily runs happening in a 30-Day period
+                let totalDailyRuns = 0;
+                docs.forEach((doc) => {
+                  const data: Project = doc.data() as Project;
+                  if (data.frequency === "daily") totalDailyRuns++;
+                });
+                const maxDailyRuns = plansData.settingsMaxDailyRuns;
+                if (totalDailyRuns >= maxDailyRuns) {
+                  errorCode = "max_daily_runs";
+                  errorMessage =
+                    "User has reached the maximum number of daily runs. Please subscribe to a higher plan, if available.";
+                } else {
+                  nStatus = status;
+                }
               } else {
-                nStatus = status;
+                throw new Error("Could not find users plan.");
               }
             }
           }
