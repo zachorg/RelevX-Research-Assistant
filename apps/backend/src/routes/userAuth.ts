@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import type Stripe from "stripe";
 import type { RelevxUserProfile, CreateProfileResponse, Plan } from "core";
+import { getPlans } from "./products.js";
 
 // API key management routes: create/list/revoke. All routes rely on the auth
 // plugin to populate req.userId and tenant authorization.
@@ -8,6 +9,7 @@ const routes: FastifyPluginAsync = async (app) => {
   const firebase = app.firebase;
   const db = firebase.db;
   const stripe = app.stripe as Stripe;
+  const remoteConfig = firebase.remoteConfig;
 
   app.get("/healthz", async (_req, rep) => {
     return rep.send({ ok: true });
@@ -97,20 +99,12 @@ const routes: FastifyPluginAsync = async (app) => {
           });
 
           if (active_subscriptions.data.length > 0) {
-            const plansRef = db.collection("plans");
-            const snapshot = await plansRef.get();
-
-            const plans: Plan[] = await Promise.all(
-              snapshot.docs.map(async (doc) => {
-                const data: Plan = doc.data() as Plan;
-                return data;
-              })
-            );
-
+            const plans: Plan[] = await getPlans(remoteConfig);
             plans.sort((a, b) => b.precedence - a.precedence);
             for (const plan of plans) {
               const subscription = active_subscriptions.data.find(
-                (s) => s.items.data[0].price.id === plan.infoStripeSubscriptionId
+                (s) =>
+                  s.items.data[0].price.id === plan.infoStripeSubscriptionId
               );
               if (subscription) {
                 updateFields.planId = plan.id;
@@ -118,8 +112,7 @@ const routes: FastifyPluginAsync = async (app) => {
                 break;
               }
             }
-          }
-          else {
+          } else {
             updateFields.planId = "";
             updateFields["billing.stripeSubscriptionId"] = "";
           }
