@@ -5,7 +5,6 @@ import type {
   CreateProjectRequest,
   CreateProjectResponse,
   Plan,
-  Project,
   RelevxDeliveryLog,
   DeliveryLog,
   ProjectDeliveryLogResponse,
@@ -130,6 +129,36 @@ export function validateActiveProjects(plan: Plan, projects: ProjectInfo[]) {
   return true;
 }
 
+async function getAllUserProjectsFromCache(
+  app: any,
+  userId: string,
+  TTL?: any
+): Promise<ProjectInfo[] | null> {
+  const cachedProjects: any = await app.redis.get(userId);
+  if (cachedProjects) {
+    return JSON.parse(cachedProjects);
+  }
+
+  const projectsSnapshot = await app.db
+    .collection("users")
+    .doc(userId)
+    .collection("projects")
+    .where("status", "!=", "deleted")
+    .get();
+
+  const projects = projectsSnapshot.docs.map((doc: any) => {
+    const { userId: _userId, id: _id, ...data } = doc.data();
+    return {
+      ...data,
+    };
+  }) as ProjectInfo[];
+
+  await app.redis.set(userId, JSON.stringify(projects));
+  if (TTL) await app.redis.expire(userId, TTL);
+
+  return projects;
+}
+
 // API key management routes: create/list/revoke. All routes rely on the auth
 // plugin to populate req.userId and tenant authorization.
 const routes: FastifyPluginAsync = async (app) => {
@@ -238,41 +267,14 @@ const routes: FastifyPluginAsync = async (app) => {
         }
 
         // check cache.. 99% of the time this will be hit
-        const cachedProjects = await app.redis.get(userId);
-        if (cachedProjects) {
-          const projects = JSON.parse(cachedProjects).filter(
-            (project: any) => project.status !== "deleted"
-          );
-          return rep.status(200).send({
-            projects,
-          } as ListProjectsResponse);
-        }
-
-        // Create or update user document in Firestore
-        const projectsSnapshot = await db
-          .collection("users")
-          .doc(userId)
-          .collection("projects")
-          .where("status", "!=", "deleted")
-          .get();
-        if (projectsSnapshot.empty) {
-          return rep
-            .status(404)
-            .send({ error: { message: "No projects found" } });
-        }
-
-        const projects = projectsSnapshot.docs.map((doc: any) => {
-          const { userId: _userId, id: _id, ...data } = doc.data();
-          return {
-            ...data,
-          };
-        }) as ProjectInfo[];
-
-        await app.redis.set(userId, JSON.stringify(projects));
-        await app.redis.expire(userId, 60 * 5);
+        const cachedProjects = await getAllUserProjectsFromCache(
+          app,
+          userId,
+          60 * 5
+        );
 
         return rep.status(200).send({
-          projects,
+          projects: cachedProjects,
         } as ListProjectsResponse);
       } catch (err: any) {
         const isDev = process.env.NODE_ENV !== "production";
@@ -476,18 +478,6 @@ const routes: FastifyPluginAsync = async (app) => {
     return snapshot.docs[0];
   };
 
-  const getAllProjects = async (userId: string) => {
-    const snapshot = await db
-      .collection("users")
-      .doc(userId)
-      .collection("projects")
-      .where("status", "!=", "deleted")
-      .get();
-
-    if (snapshot.empty) return null;
-    return snapshot.docs;
-  };
-
   app.post(
     "/update",
     { preHandler: [app.rlPerRoute(10)] },
@@ -645,20 +635,8 @@ const routes: FastifyPluginAsync = async (app) => {
             .status(400)
             .send({ error: { message: "Title is required" } });
 
-        const cachedProjects = await app.redis.get(userId);
-        let projects: ProjectInfo[] | undefined = undefined;
-        if (!cachedProjects) {
-          const projs = await getAllProjects(userId);
-          projects = projs?.map((doc) => {
-            const { id, userId, ...data } = doc.data() as Project;
-            return data as ProjectInfo;
-          });
-          await app.redis.set(userId, JSON.stringify(projects));
-          await app.redis.expire(userId, 60 * 5);
-        } else {
-          projects = JSON.parse(cachedProjects);
-        }
-
+        const projects: ProjectInfo[] | null =
+          await getAllUserProjectsFromCache(app, userId, 60 * 5);
         const activeProjects = projects?.filter(
           (p: ProjectInfo) => p.status === "active"
         );
