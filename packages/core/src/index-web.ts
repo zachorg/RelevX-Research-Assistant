@@ -87,6 +87,3 @@ export {
   validateFrequency,
   isProjectDue,
 } from "./utils/scheduling";
-
-// Hooks
-// export { useAuth } from "./hooks/useAuth";

@@ -71,7 +71,11 @@ export type {
   CreateProfileResponse,
 } from "./models/users";
 
-export type { AnalyticsDocument } from "./models/analytics";
+export type {
+  AnalyticsDocument,
+  TopDownAnalyticsDocument,
+  UserAnalyticsDocument,
+} from "./models/analytics";
 
 // Services
 export { auth, db } from "./services/firebase";
@@ -156,3 +160,9 @@ export {
 export { saveSearchResults } from "./services/research-engine/result-storage";
 
 export { sendReportEmail } from "./services/email";
+
+export {
+  getUserAnalytics,
+  kAnalyticsCollectionTopDown,
+  kAnalyticsUserCollection,
+} from "./utils/analytics";

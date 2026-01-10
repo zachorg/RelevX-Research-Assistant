@@ -1,105 +1,111 @@
 import { Firestore } from "firebase-admin/firestore";
-import { AnalyticsDocument, Plan, PlanInfo } from "core";
+import {
+  AnalyticsDocument,
+  Plan,
+  TopDownAnalyticsDocument,
+  UserAnalyticsDocument,
+  kAnalyticsCollectionTopDown,
+  kAnalyticsUserCollection,
+} from "core";
 
-export const kCompletedResearchByUser = (
-    userId: string,
-) => `${userId}`;
+export const kCompletedResearchByUser = (userId: string) => `${userId}`;
 
-async function update_topdown_analytics_completed_research(db: Firestore, numResearch: number = 1) {
-    if (!db) {
-        throw new Error("Firebase firestore not initialized");
+async function update_topdown_analytics_completed_research(
+  db: Firestore,
+  numResearch: number = 1
+) {
+  if (!db) {
+    throw new Error("Firebase firestore not initialized");
+  }
+
+  const dateKey = new Date().toISOString().substring(0, 7); // YYYY-MM format
+  const usageRef = db.doc(kAnalyticsCollectionTopDown(dateKey));
+
+  await db.runTransaction(async (transaction) => {
+    const usageDoc = await transaction.get(usageRef);
+
+    // Omit the monthly requests from the analytics document
+    let data: TopDownAnalyticsDocument = {
+      num_completed_monthly_research: 0,
+    };
+    if (usageDoc.exists) {
+      data = usageDoc.data() as TopDownAnalyticsDocument;
     }
 
-    const dateKey = new Date().toISOString().substring(0, 7); // YYYY-MM format
-    const usageRef = db.doc(`analytics/research/v1/topdown/${dateKey}`);
-
-    await db.runTransaction(async (transaction) => {
-        const usageDoc = await transaction.get(usageRef);
-
-        // Omit the monthly requests from the analytics document
-        let data: Omit<AnalyticsDocument, "num_completed_daily_research" | "num_completed_research"> = {
-            num_completed_monthly_research: 0,
-        };
-        if (usageDoc.exists) {
-            data = usageDoc.data() as AnalyticsDocument;
-        }
-
-        const key = "num_completed_monthly_research";
-        const num_completed_monthly_research = data[key];
-        transaction.set(
-            usageRef,
-            {
-                ...data,
-                [key]: num_completed_monthly_research + numResearch,
-            },
-            { merge: true }
-        );
-    });
+    const key = "num_completed_monthly_research";
+    const num_completed_monthly_research = data[key];
+    transaction.set(
+      usageRef,
+      {
+        ...data,
+        [key]: num_completed_monthly_research + numResearch,
+      },
+      { merge: true }
+    );
+  });
 }
 
 export async function check_and_increment_research_usage(
-    onRun: () => Promise<boolean>,
-    db: Firestore,
-    userId: string,
-    plan: Plan,
-    numResearch: number = 1,
+  onRun: () => Promise<boolean>,
+  db: Firestore,
+  userId: string,
+  plan: Plan,
+  projectId: string
 ): Promise<boolean> {
-    if (!db) {
-        throw new Error("Firebase firestore not initialized");
+  if (!db) {
+    throw new Error("Firebase firestore not initialized");
+  }
+
+  const dateKey = new Date().toISOString().substring(0, 10); // YYYY-MM-DD format
+  const usageRef = db.doc(kAnalyticsUserCollection(userId, dateKey));
+
+  const result: any = await db.runTransaction(async (transaction) => {
+    const usageDoc = await transaction.get(usageRef);
+
+    let data: UserAnalyticsDocument = {
+      num_completed_daily_research_projects: {},
+      num_completed_research: 0,
+    };
+    if (usageDoc.exists) {
+      data = usageDoc.data() as UserAnalyticsDocument;
     }
 
-    const usageRef = db.doc(`analytics/research/v1/${userId}`);
+    const key = "num_completed_research";
+    const completed_requests = data[key];
 
-    const result: any = await db.runTransaction(
-        async (transaction) => {
-            const dateKey = new Date().toISOString().substring(0, 10); // YYYY-MM-DD format
+    const key_daily = "num_completed_daily_research_projects";
+    const completed_daily_projects = data[key_daily];
 
-            const usageDoc = await transaction.get(usageRef);
+    const currentCount = completed_daily_projects?.length || 0;
 
-            let data: Omit<AnalyticsDocument, "num_completed_monthly_research"> = {
-                num_completed_daily_research: {},
-                num_completed_research: 0,
-            };
-            if (usageDoc.exists) {
-                data = usageDoc.data() as AnalyticsDocument;
-            }
+    // assume always one project update
+    if (currentCount + 1 > plan.settingsMaxDailyRuns) {
+      return false;
+    }
 
-            const key = "num_completed_research";
-            const completed_requests = data[key];
+    const success = await onRun();
+    if (!success) {
+      return false;
+    }
 
-            const key_daily = "num_completed_daily_research";
-            const completed_daily_requests = data[key_daily];
-
-            const currentCount = completed_daily_requests[dateKey] || 0;
-
-            if (currentCount + numResearch > plan.settingsMaxDailyRuns) {
-                return false;
-            }
-
-            const success = await onRun();
-            if (!success) {
-                return false;
-            }
-
-            transaction.set(
-                usageRef,
-                {
-                    ...data,
-                    [key]: completed_requests + numResearch,
-                    [key_daily]: {
-                        ...completed_daily_requests,
-                        [dateKey]: currentCount + numResearch,
-                    },
-                } as AnalyticsDocument,
-                { merge: true }
-            );
-
-            // no need to wait for this to complete
-            update_topdown_analytics_completed_research(db, numResearch);
-
-            return true;
-        }
+    completed_daily_projects.push(projectId);
+    transaction.set(
+      usageRef,
+      {
+        ...data,
+        [key]: completed_requests + 1,
+        [key_daily]: {
+          ...completed_daily_projects,
+        },
+      } as AnalyticsDocument,
+      { merge: true }
     );
 
-    return result;
+    // no need to wait for this to complete
+    update_topdown_analytics_completed_research(db, 1);
+
+    return true;
+  });
+
+  return result;
 }

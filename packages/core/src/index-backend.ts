@@ -45,3 +45,15 @@ export type {
   DeliveryLog,
   ProjectDeliveryLogResponse,
 } from "./models/delivery-log";
+
+export type {
+  AnalyticsDocument,
+  TopDownAnalyticsDocument,
+  UserAnalyticsDocument,
+} from "./models/analytics";
+
+export {
+  getUserAnalytics,
+  kAnalyticsCollectionTopDown,
+  kAnalyticsUserCollection,
+} from "./utils/analytics";
