@@ -47,12 +47,12 @@ async function update_topdown_analytics_completed_research(
 }
 
 export async function check_and_increment_research_usage(
-  onRun: () => Promise<boolean>,
+  onRun: () => Promise<any>,
   db: Firestore,
   userId: string,
   plan: Plan,
   projectId: string
-): Promise<boolean> {
+): Promise<any> {
   if (!db) {
     throw new Error("Firebase firestore not initialized");
   }
@@ -75,37 +75,38 @@ export async function check_and_increment_research_usage(
     const completed_requests = data[key];
 
     const key_daily = "num_completed_daily_research_projects";
-    const completed_daily_projects = data[key_daily];
+    const completed_daily_projects: Array<string> = data[key_daily];
 
     const currentCount = completed_daily_projects?.length || 0;
 
     // assume always one project update
-    if (currentCount + 1 > plan.settingsMaxDailyRuns) {
+    if (
+      currentCount + 1 > plan.settingsMaxDailyRuns ||
+      completed_daily_projects?.includes(projectId)
+    ) {
       return false;
     }
 
-    const success = await onRun();
-    if (!success) {
-      return false;
+    const value = await onRun();
+    if (value) {
+      completed_daily_projects.push(projectId);
+      transaction.set(
+        usageRef,
+        {
+          ...data,
+          [key]: completed_requests + 1,
+          [key_daily]: {
+            ...completed_daily_projects,
+          },
+        } as AnalyticsDocument,
+        { merge: true }
+      );
+
+      // no need to wait for this to complete
+      update_topdown_analytics_completed_research(db, 1);
     }
 
-    completed_daily_projects.push(projectId);
-    transaction.set(
-      usageRef,
-      {
-        ...data,
-        [key]: completed_requests + 1,
-        [key_daily]: {
-          ...completed_daily_projects,
-        },
-      } as AnalyticsDocument,
-      { merge: true }
-    );
-
-    // no need to wait for this to complete
-    update_topdown_analytics_completed_research(db, 1);
-
-    return true;
+    return value;
   });
 
   return result;

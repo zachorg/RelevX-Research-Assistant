@@ -31,6 +31,7 @@ type Firestore = any; // Will be firebase/firestore Firestore or firebase-admin 
 
 let auth: Auth = null;
 let db: Firestore = null;
+let fireBaseRemoteConfig: any = null;
 let initialized = false;
 
 /**
@@ -45,8 +46,7 @@ function initializeFirebase(): void {
   initialized = true;
 
   const hasAdminCredentials =
-    process.env.FIREBASE_ADMIN_CLIENT_EMAIL ||
-    process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+    process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_client_email;
 
   useAdminSDK = !!(isNode && hasAdminCredentials);
 
@@ -62,36 +62,20 @@ function initializeFirebase(): void {
     try {
       // Check if app is already initialized
       if (admin.apps.length === 0) {
-        if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
-          // Load from file
-          const serviceAccount = require(process.env
-            .FIREBASE_SERVICE_ACCOUNT_PATH);
-
-          admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-            projectId: process.env.FIREBASE_PROJECT_ID,
-          });
-
-          console.log("Firebase Admin initialized with service account file");
-        } else if (
-          process.env.FIREBASE_ADMIN_CLIENT_EMAIL &&
-          process.env.FIREBASE_ADMIN_PRIVATE_KEY
-        ) {
-          // Load from environment variables
-          admin.initializeApp({
-            credential: admin.credential.cert({
-              projectId: process.env.FIREBASE_PROJECT_ID,
-              clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-              privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY.replace(
+        // Load from environment variables
+        admin.initializeApp({
+          credential: admin.credential.cert({
+            projectId: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_project_id,
+            privateKey:
+              process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_private_key?.replace(
                 /\\n/g,
                 "\n"
               ),
-            }),
-            projectId: process.env.FIREBASE_PROJECT_ID,
-          });
-
-          console.log("Firebase Admin initialized with environment variables");
-        }
+            clientEmail:
+              process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_client_email,
+          }),
+          projectId: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_project_id,
+        });
       }
 
       db = admin.firestore();
@@ -100,6 +84,8 @@ function initializeFirebase(): void {
       db.settings({
         ignoreUndefinedProperties: true,
       });
+
+      fireBaseRemoteConfig = admin.remoteConfig();
 
       console.log("Firestore Admin initialized successfully");
     } catch (error: any) {
@@ -110,56 +96,7 @@ function initializeFirebase(): void {
     // Auth is not available in Admin SDK context
     auth = null;
   } else {
-    // ============================================================================
-    // CLIENT-SIDE: Use Firebase Client SDK
-    // ============================================================================
-    console.log("Initializing Firebase Client SDK for browser/mobile use");
-
-    // Only import when needed (lazy loading)
-    const { initializeApp, getApps } = require("firebase/app");
-    const { getAuth } = require("firebase/auth");
-    const { getFirestore } = require("firebase/firestore");
-
-    // Load Firebase configuration from environment variables
-    const firebaseConfig = {
-      apiKey: process.env.FIREBASE_API_KEY,
-      authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-      appId: process.env.FIREBASE_APP_ID,
-    };
-
-    // Validate required environment variables
-    const requiredEnvVars = [
-      "FIREBASE_API_KEY",
-      "FIREBASE_AUTH_DOMAIN",
-      "FIREBASE_PROJECT_ID",
-      "FIREBASE_STORAGE_BUCKET",
-      "FIREBASE_MESSAGING_SENDER_ID",
-      "FIREBASE_APP_ID",
-    ];
-
-    const missingEnvVars = requiredEnvVars.filter(
-      (varName) => !process.env[varName]
-    );
-
-    if (missingEnvVars.length > 0) {
-      throw new Error(
-        `Missing required Firebase environment variables: ${missingEnvVars.join(
-          ", "
-        )}. Please check your .env file and env.example for reference.`
-      );
-    }
-
-    // Initialize Firebase (only once)
-    const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-
-    // Export auth and firestore instances
-    auth = getAuth(app);
-    db = getFirestore(app);
-
-    console.log("Firebase Client SDK initialized successfully");
+    throw new Error("Firebase not initialized");
   }
 }
 
@@ -200,8 +137,36 @@ const dbProxy = new Proxy(
   }
 ) as Firestore;
 
+const fireBaseRemoteConfigProxy = new Proxy(
+  {},
+  {
+    get(target, prop) {
+      if (!initialized) {
+        initializeFirebase();
+      }
+      if (!fireBaseRemoteConfig) {
+        throw new Error("Remote Config not initialized");
+      }
+      return (fireBaseRemoteConfig as any)[prop];
+    },
+    apply(target, thisArg, argumentsList) {
+      if (!initialized) {
+        initializeFirebase();
+      }
+      if (!fireBaseRemoteConfig) {
+        throw new Error("Remote Config not initialized");
+      }
+      return (fireBaseRemoteConfig as any).apply(thisArg, argumentsList);
+    },
+  }
+) as any;
+
 // Export the proxied instances
-export { authProxy as auth, dbProxy as db };
+export {
+  authProxy as auth,
+  dbProxy as db,
+  fireBaseRemoteConfigProxy as fireBaseRemoteConfig,
+};
 
 // Export a flag to check which SDK is being used
 export { useAdminSDK as isUsingAdminSDK };

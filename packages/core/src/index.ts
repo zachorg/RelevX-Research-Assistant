@@ -78,7 +78,7 @@ export type {
 } from "./models/analytics";
 
 // Services
-export { auth, db } from "./services/firebase";
+export { auth, db, fireBaseRemoteConfig } from "./services/firebase";
 export { signInWithGoogle, signOut } from "./services/auth";
 // export {
 //   createProject,

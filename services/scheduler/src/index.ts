@@ -15,11 +15,12 @@ import { loadAwsSecrets } from "./plugins/aws";
 import { Queue } from "elegant-queue";
 
 // Import types from core package
-import type { NewDeliveryLog, Project, RelevxUserProfile } from "core";
+import type { NewDeliveryLog, Plan, Project, RelevxUserProfile } from "core";
 import { sendReportEmail } from "core";
 
 // Import scheduling utility
 import { calculateNextRunAt } from "core";
+import { check_and_increment_research_usage } from "./plugins/analytics";
 
 // Provider instances (initialized once at startup)
 let providersInitialized = false;
@@ -96,20 +97,47 @@ async function executeProjectResearch(
     frequency: project.frequency,
     deliveryStatus: status,
   });
+  // Import the research engine from core package
+  const { executeResearchForProject, db, fireBaseRemoteConfig } = await import(
+    "core"
+  );
+
+  async function getRemoteConfigParam(remoteConfig: any, key: string) {
+    try {
+      const param = (await remoteConfig.getTemplate()).parameters[key];
+      return param;
+    } catch (error) {
+      console.error("Error fetching remote config:", error);
+    }
+    return null;
+  }
+
+  async function getPlans(remoteConfig: any): Promise<Plan[]> {
+    const config = await getRemoteConfigParam(remoteConfig, "plans");
+    const plansRaw = config?.defaultValue?.value;
+    if (plansRaw) {
+      const parsed = JSON.parse(plansRaw);
+      const plansArray: Plan[] = Array.isArray(parsed)
+        ? parsed
+        : Object.values(parsed);
+
+      if (!Array.isArray(plansArray)) {
+        throw new Error("Parsed plans is not an array or valid object");
+      }
+      return plansArray;
+    }
+
+    return [];
+  }
 
   try {
     // Ensure providers are initialized
     await initializeProviders();
 
-    // Import the research engine from core package
-    const { executeResearchForProject, db } = await import("core");
+    const userDoc = await db.collection("users").doc(userId);
 
     // Update project status to running
-    const projectRef = db
-      .collection("users")
-      .doc(userId)
-      .collection("projects")
-      .doc(project.id);
+    const projectRef = userDoc.collection("projects").doc(project.id);
 
     await projectRef.update({
       status: "running",
@@ -117,46 +145,95 @@ async function executeProjectResearch(
       updatedAt: Date.now(),
     });
 
-    // Execute research (this will save with default "success" status)
-    // We need to pass the status through the options
-    const result = await executeResearchForProject(userId, project.id);
+    const plans = await getPlans(fireBaseRemoteConfig);
+    const userData = (await userDoc.get())?.data() as RelevxUserProfile;
+    const plan = plans.find((p) => p.id === userData.planId);
 
-    if (result.success && result.deliveryLogId) {
-      // If we need pending status, update the delivery log
-      if (status === "pending") {
-        const deliveryLogRef = db
-          .collection("users")
-          .doc(userId)
-          .collection("projects")
-          .doc(project.id)
-          .collection("deliveryLogs")
-          .doc(result.deliveryLogId);
-
-        await deliveryLogRef.update({
-          status: "pending",
-          preparedAt: Date.now(),
-          deliveredAt: null,
-        });
-      }
-
-      logger.info("Research execution completed successfully", {
-        userId,
-        projectId: project.id,
-        resultsCount: result.relevantResults.length,
-        durationMs: result.durationMs,
-        deliveryLogId: result.deliveryLogId,
-        status,
-      });
-
-      return result.deliveryLogId;
-    } else {
-      logger.error("Research execution failed", {
-        userId,
-        projectId: project.id,
-        error: result.error,
-      });
-      return null;
+    if (!plan) {
+      throw new Error("Plan not found");
     }
+
+    const value = await check_and_increment_research_usage(
+      async () => {
+        try {
+          // Execute research (this will save with default "success" status)
+          // We need to pass the status through the options
+          const result = await executeResearchForProject(userId, project.id);
+
+          if (result.success && result.deliveryLogId) {
+            // If we need pending status, update the delivery log
+            if (status === "pending") {
+              const deliveryLogRef = db
+                .collection("users")
+                .doc(userId)
+                .collection("projects")
+                .doc(project.id)
+                .collection("deliveryLogs")
+                .doc(result.deliveryLogId);
+
+              await deliveryLogRef.update({
+                status: "pending",
+                preparedAt: Date.now(),
+                deliveredAt: null,
+              });
+            }
+
+            logger.info("Research execution completed successfully", {
+              userId,
+              projectId: project.id,
+              resultsCount: result.relevantResults.length,
+              durationMs: result.durationMs,
+              deliveryLogId: result.deliveryLogId,
+              status,
+            });
+
+            return result.deliveryLogId;
+          } else {
+            logger.error("Research execution failed", {
+              userId,
+              projectId: project.id,
+              error: result.error,
+            });
+            return null;
+          }
+        } catch (error: any) {
+          const errorCode = error.message.split(":")[0];
+
+          // E0001 is for daily limit exceeded -- that means we do not need to error out the project..
+          if (errorCode !== "E0001") {
+            // Update project with error status
+            try {
+              const { db } = await import("core");
+              await db
+                .collection("users")
+                .doc(userId)
+                .collection("projects")
+                .doc(project.id)
+                .update({
+                  status: "error",
+                  lastError: error.message,
+                  researchStartedAt: null,
+                  updatedAt: Date.now(),
+                });
+            } catch (updateError: any) {
+              logger.error("Failed to update project error status", {
+                userId,
+                projectId: project.id,
+                error: updateError.message,
+              });
+            }
+          }
+
+          return false;
+        }
+      },
+      db,
+      userId,
+      plan,
+      project.id
+    );
+
+    return value;
   } catch (error: any) {
     logger.error("Research execution error", {
       userId,
@@ -164,33 +241,6 @@ async function executeProjectResearch(
       error: error.message,
       stack: error.stack,
     });
-
-    const errorCode = error.message.split(":")[0];
-
-    // E0001 is for daily limit exceeded -- that means we do not need to error out the project..
-    if (errorCode !== "E0001") {
-      // Update project with error status
-      try {
-        const { db } = await import("core");
-        await db
-          .collection("users")
-          .doc(userId)
-          .collection("projects")
-          .doc(project.id)
-          .update({
-            status: "error",
-            lastError: error.message,
-            researchStartedAt: null,
-            updatedAt: Date.now(),
-          });
-      } catch (updateError: any) {
-        logger.error("Failed to update project error status", {
-          userId,
-          projectId: project.id,
-          error: updateError.message,
-        });
-      }
-    }
 
     return null;
   }

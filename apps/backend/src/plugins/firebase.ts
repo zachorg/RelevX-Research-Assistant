@@ -5,18 +5,17 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getRemoteConfig } from "firebase-admin/remote-config";
 
 export default fp(async (app: any) => {
+  const certObject =
+    process.env.FIREBASE_SERVICE_ACCOUNT_JSON &&
+    JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+
+  if (!certObject) {
+    throw new Error("Firebase service account JSON not found");
+  }
   // Firebase Admin app instance
   const firebaseApp = initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_project_id,
-      privateKey:
-        process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_private_key?.replace(
-          /\\n/g,
-          "\n"
-        ),
-      clientEmail: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_client_email,
-    }),
-    projectId: process.env.FIREBASE_BACKEND_SERVICE_ACCOUNT_project_id,
+    credential: cert(certObject),
+    projectId: certObject.project_id,
   });
 
   // Services
