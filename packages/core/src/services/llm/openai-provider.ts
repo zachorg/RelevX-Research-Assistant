@@ -26,7 +26,7 @@ import {
   compileReport as openaiCompileReport,
   compileReportWithRetry as openaiCompileReportRetry,
 } from "./report-compilation";
-import { filterSearchResultsSafe } from "./search-filtering"; 
+import { filterSearchResultsSafe } from "./search-filtering";
 import { initializeOpenAI as initOpenAI, getClient } from "./client";
 
 /**
@@ -131,16 +131,20 @@ export class OpenAIProvider implements LLMProvider {
     options?: {
       tone?: "professional" | "casual" | "technical";
       maxLength?: number;
+      projectTitle?: string;
+      frequency?: "daily" | "weekly" | "monthly";
     }
   ): Promise<CompiledReport> {
     this.ensureInitialized();
 
     // Use the existing OpenAI function with retry logic
     const report = await openaiCompileReportRetry(
-      results,
-      "Research Report", // projectTitle - use a default since interface doesn't require it
-      projectDescription,
-      undefined, // searchParams
+      {
+        results,
+        projectTitle: options?.projectTitle || "Research Report",
+        projectDescription,
+        frequency: options?.frequency,
+      },
       3 // maxRetries
     );
 

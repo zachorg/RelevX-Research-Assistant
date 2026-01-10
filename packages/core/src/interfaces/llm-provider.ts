@@ -126,6 +126,8 @@ export interface LLMProvider {
     options?: {
       tone?: "professional" | "casual" | "technical";
       maxLength?: number;
+      projectTitle?: string;
+      frequency?: "daily" | "weekly" | "monthly";
     }
   ): Promise<CompiledReport>;
 }

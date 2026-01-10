@@ -93,7 +93,9 @@ function getFreshnessForFrequency(
  * - pm (past month) -> py (past year)
  * - py (past year) -> undefined (no further expansion)
  */
-function getFallbackFreshness(currentFreshness: Freshness): Freshness | undefined {
+function getFallbackFreshness(
+  currentFreshness: Freshness
+): Freshness | undefined {
   switch (currentFreshness) {
     case "pd":
       return "pw"; // Expand from day to week
@@ -188,9 +190,13 @@ export async function executeResearchForProject(
     };
 
     // 5.1 Determine initial freshness based on project frequency
-    let currentFreshness: Freshness = getFreshnessForFrequency(project.frequency);
+    let currentFreshness: Freshness = getFreshnessForFrequency(
+      project.frequency
+    );
     console.log(
-      `Initial freshness for ${project.frequency} project: ${currentFreshness} (${describeFreshness(currentFreshness)})`
+      `Initial freshness for ${
+        project.frequency
+      } project: ${currentFreshness} (${describeFreshness(currentFreshness)})`
     );
 
     // 6. Tracking
@@ -212,7 +218,11 @@ export async function executeResearchForProject(
 
     while (iteration <= maxIterations) {
       console.log(`\n=== Research Iteration ${iteration}/${maxIterations} ===`);
-      console.log(`Using freshness: ${currentFreshness} (${describeFreshness(currentFreshness)})`);
+      console.log(
+        `Using freshness: ${currentFreshness} (${describeFreshness(
+          currentFreshness
+        )})`
+      );
 
       // 7.1 Generate search queries
       console.log("Generating search queries...");
@@ -533,13 +543,17 @@ export async function executeResearchForProject(
         const fallbackFreshness = getFallbackFreshness(currentFreshness);
         if (fallbackFreshness) {
           console.log(
-            `Not enough results with ${describeFreshness(currentFreshness)}, expanding to ${describeFreshness(fallbackFreshness)}`
+            `Not enough results with ${describeFreshness(
+              currentFreshness
+            )}, expanding to ${describeFreshness(fallbackFreshness)}`
           );
           currentFreshness = fallbackFreshness;
           freshnessExpanded = true;
         } else {
           console.log(
-            `Already at maximum freshness range (${describeFreshness(currentFreshness)}), cannot expand further`
+            `Already at maximum freshness range (${describeFreshness(
+              currentFreshness
+            )}), cannot expand further`
           );
         }
       }
@@ -579,6 +593,8 @@ export async function executeResearchForProject(
         {
           tone: "professional",
           maxLength: 5000,
+          projectTitle: project.title,
+          frequency: project.frequency,
         }
       );
 

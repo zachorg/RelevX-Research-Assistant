@@ -4,18 +4,45 @@
 
 import { getClient } from "./client";
 import { REPORT_COMPILATION_PROMPTS, renderPrompt } from "./prompts";
-import type { SearchParameters } from "../../models/project";
+import type { SearchParameters, Frequency } from "../../models/project";
 import type { ResultForReport, CompiledReport } from "./types";
+
+/**
+ * Options for report compilation
+ */
+export interface CompileReportOptions {
+  results: ResultForReport[];
+  projectTitle: string;
+  projectDescription: string;
+  frequency?: Frequency;
+  searchParams?: SearchParameters;
+}
+
+/**
+ * Format date for display in reports
+ */
+function formatReportDate(): string {
+  return new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 /**
  * Compile relevant results into a markdown report
  */
 export async function compileReport(
-  results: ResultForReport[],
-  projectTitle: string,
-  projectDescription: string,
-  searchParams?: SearchParameters
+  options: CompileReportOptions
 ): Promise<CompiledReport> {
+  const {
+    results,
+    projectTitle,
+    projectDescription,
+    frequency = "weekly",
+  } = options;
+
   const client = getClient();
 
   if (results.length === 0) {
@@ -52,6 +79,8 @@ ${r.snippet}
   const userPrompt = renderPrompt(REPORT_COMPILATION_PROMPTS.user, {
     projectTitle,
     projectDescription,
+    frequency,
+    reportDate: formatReportDate(),
     resultCount: results.length,
     resultsFormatted,
   });
@@ -59,6 +88,7 @@ ${r.snippet}
   try {
     const response = await client.chat.completions.create({
       model: REPORT_COMPILATION_PROMPTS.model,
+      temperature: REPORT_COMPILATION_PROMPTS.temperature ?? 0.7,
       messages: [
         { role: "system", content: REPORT_COMPILATION_PROMPTS.system },
         { role: "user", content: userPrompt },
@@ -95,22 +125,14 @@ ${r.snippet}
  * Compile report with retry logic
  */
 export async function compileReportWithRetry(
-  results: ResultForReport[],
-  projectTitle: string,
-  projectDescription: string,
-  searchParams?: SearchParameters,
+  options: CompileReportOptions,
   maxRetries: number = 3
 ): Promise<CompiledReport> {
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      return await compileReport(
-        results,
-        projectTitle,
-        projectDescription,
-        searchParams
-      );
+      return await compileReport(options);
     } catch (error) {
       lastError = error as Error;
       console.warn(

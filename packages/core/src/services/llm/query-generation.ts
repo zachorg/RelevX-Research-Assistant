@@ -90,6 +90,7 @@ export async function generateSearchQueries(
   try {
     const response = await client.chat.completions.create({
       model: QUERY_GENERATION_PROMPTS.model,
+      temperature: QUERY_GENERATION_PROMPTS.temperature ?? 0.7,
       messages: [
         { role: "system", content: QUERY_GENERATION_PROMPTS.system },
         { role: "user", content: userPrompt },

@@ -22,7 +22,11 @@ export {
   filterSearchResultsSafe,
 } from "./search-filtering";
 
-export { compileReport, compileReportWithRetry } from "./report-compilation";
+export {
+  compileReport,
+  compileReportWithRetry,
+  type CompileReportOptions,
+} from "./report-compilation";
 
 export {
   QUERY_GENERATION_PROMPTS,
