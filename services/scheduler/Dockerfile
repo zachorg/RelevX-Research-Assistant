@@ -4,16 +4,13 @@
 # Stage 1: Build stage
 FROM node:20-alpine AS builder
 
-# Install pnpm
-RUN npm install -g pnpm
+# Enable corepack for pnpm (built into Node.js)
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Set working directory
 WORKDIR /app
 
 # Copy workspace and package files
-COPY pnpm-workspace.yaml ./
-COPY package.json pnpm-lock.yaml ./
-COPY tsconfig.base.json ./
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
 
 # Copy core package
 COPY packages/core/package.json ./packages/core/
@@ -25,72 +22,43 @@ COPY services/scheduler/package.json ./services/scheduler/
 COPY services/scheduler/tsconfig.json ./services/scheduler/
 COPY services/scheduler/src ./services/scheduler/src
 
-# Install dependencies for both packages
-RUN pnpm install --frozen-lockfile
 
-# Build core package first
-WORKDIR /app/packages/core
-RUN pnpm run build
-
-# Build scheduler package
-WORKDIR /app/services/scheduler
-RUN pnpm run build
+# Install all dependencies and build
+ENV CI=true
+RUN pnpm install --frozen-lockfile && \
+    pnpm --filter core run build && \
+    pnpm --filter scheduler run build && \
+    pnpm prune --prod && \
+    pnpm store prune
 
 # Stage 2: Production stage
 FROM node:20-alpine
 
-# Install pnpm and dumb-init
-RUN npm install -g pnpm && \
-    apk add --no-cache dumb-init
+# Install dumb-init for signal handling
+RUN apk add --no-cache dumb-init
 
-# Set working directory
 WORKDIR /app
 
-# Copy workspace and package files
-COPY pnpm-workspace.yaml ./
-COPY package.json pnpm-lock.yaml ./
-
-# Copy core package.json to ensure its dependencies are installed
-COPY packages/core/package.json ./packages/core/
-
-# Copy scheduler package files
-COPY services/scheduler/package.json ./services/scheduler/
-
-# Install only production dependencies
-# This will install dependencies for both scheduler and core packages
-RUN pnpm install --frozen-lockfile --prod && \
-    pnpm store prune
-
-# Copy built JavaScript from builder stage
-COPY --from=builder /app/services/scheduler/dist ./services/scheduler/dist
+# Copy built artifacts and production node_modules from builder
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/core/dist ./packages/core/dist
+COPY --from=builder /app/packages/core/package.json ./packages/core/
+COPY --from=builder /app/packages/core/node_modules ./packages/core/node_modules
+COPY --from=builder /app/services/scheduler/dist ./services/scheduler/dist
+COPY --from=builder /app/services/scheduler/package.json ./services/scheduler/
+COPY --from=builder /app/services/scheduler/node_modules ./services/scheduler/node_modules
 
-# Set working directory to scheduler
-WORKDIR /app/services/scheduler
-
-# Create a non-root user
+# Create non-root user and set ownership
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
 
-# Change ownership of the app directory
-RUN chown -R nodejs:nodejs /app /app/services/scheduler /app/packages/core
-
-# Switch to non-root user
 USER nodejs
 
-# Expose port for health checks (if needed)
-EXPOSE 3000
+WORKDIR /app/services/scheduler
 
-# Set environment variables
 ENV NODE_ENV=production
 ENV LOG_LEVEL=info
 
-# Health check (optional - pings the process to ensure it's alive)
-HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
-    CMD node -e "console.log('healthy')" || exit 1
-
-# Use dumb-init to properly handle signals
 ENTRYPOINT ["dumb-init", "--"]
-
-# Start the scheduler
 CMD ["node", "dist/services/scheduler/src/index.js"]
