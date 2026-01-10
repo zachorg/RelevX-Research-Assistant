@@ -765,9 +765,10 @@ async function startScheduler(): Promise<void> {
   cron.schedule(cronExpression, async () => {
     await runSchedulerJob();
   });
-  cron.schedule("1 * * * * *", async () => {
+  // Run delivery queue every second
+  setInterval(async () => {
     await runDeliveryQueue();
-  });
+  }, 1000);
 
   logger.info("Scheduler service started successfully", {
     schedule: "Every minute",
