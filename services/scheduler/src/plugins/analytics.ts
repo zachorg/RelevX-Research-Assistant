@@ -5,6 +5,7 @@ import {
   TopDownAnalyticsDocument,
   UserAnalyticsDocument,
   kAnalyticsCollectionTopDown,
+  kAnalyticsDailyDateKey,
   kAnalyticsUserCollection,
 } from "core";
 
@@ -18,7 +19,7 @@ async function update_topdown_analytics_completed_research(
     throw new Error("Firebase firestore not initialized");
   }
 
-  const dateKey = new Date().toISOString().substring(0, 7); // YYYY-MM format
+  const dateKey = kAnalyticsDailyDateKey(new Date()); // YYYY-MM format
   const usageRef = db.doc(kAnalyticsCollectionTopDown(dateKey));
 
   await db.runTransaction(async (transaction) => {
@@ -56,7 +57,7 @@ export async function check_and_increment_research_usage(
     throw new Error("Firebase firestore not initialized");
   }
 
-  const dateKey = new Date().toISOString().substring(0, 10); // YYYY-MM-DD format
+  const dateKey = kAnalyticsDailyDateKey(new Date()); // YYYY-MM-DD format
   const usageRef = db.doc(kAnalyticsUserCollection(userId, dateKey));
 
   const result: any = await db.runTransaction(async (transaction) => {

@@ -56,4 +56,5 @@ export {
   getUserAnalytics,
   kAnalyticsCollectionTopDown,
   kAnalyticsUserCollection,
+  kAnalyticsDailyDateKey,
 } from "./utils/analytics";

@@ -8,8 +8,9 @@ import type {
   RelevxDeliveryLog,
   DeliveryLog,
   ProjectDeliveryLogResponse,
+  AnalyticsDocument,
 } from "core";
-import { Frequency } from "core";
+import { Frequency, getUserAnalytics } from "core";
 import { set, isAfter, add } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { isUserSubscribed } from "../utils/billing.js";
@@ -43,18 +44,21 @@ function addFrequencyPeriod(date: Date, frequency: Frequency): Date {
 }
 
 /**
- * Calculate the next run timestamp based on frequency, delivery time, and timezone
+ * Calculate the new run timestamp based on frequency, delivery time, and timezone. If delivery time has passed, it will calculate the next run based on the frequency.
  * @param frequency - daily, weekly, or monthly
  * @param deliveryTime - HH:MM format in user's timezone
  * @param timezone - IANA timezone identifier (e.g., "America/New_York")
- * @param lastRunAt - Optional timestamp of last execution
+ * @param dayOfWeek - 0-6 (Sunday-Saturday), used when frequency is "weekly"
+ * @param dayOfMonth - 1-31, used when frequency is "monthly"
  * @returns Timestamp (milliseconds) for next execution
  */
-function calculateNextRunAt(
+function calculateNewRunAt(
   frequency: Frequency,
   deliveryTime: string,
-  timezone: string
-  // lastRunAt?: number
+  timezone: string,
+  dayOfWeek?: number,
+  dayOfMonth?: number,
+  forceNextRun: boolean = false
 ): number {
   // Parse delivery time
   const [hours, minutes] = deliveryTime.split(":").map(Number);
@@ -73,13 +77,69 @@ function calculateNextRunAt(
     milliseconds: 0,
   });
 
-  // If we've already passed the delivery time today, move to the next period
-  if (!isAfter(nextRunInUserTz, nowInUserTz)) {
+  // Handle weekly frequency - find the next occurrence of the specified day
+  if (frequency === "weekly" && dayOfWeek !== undefined) {
+    const currentDayOfWeek = nextRunInUserTz.getDay();
+    let daysUntilTarget = dayOfWeek - currentDayOfWeek;
+
+    // If today is the target day but time has passed, or if target day is earlier in week
+    if (
+      daysUntilTarget < 0 ||
+      (daysUntilTarget === 0 && !isAfter(nextRunInUserTz, nowInUserTz))
+    ) {
+      daysUntilTarget += 7;
+    }
+
+    nextRunInUserTz = add(nextRunInUserTz, { days: daysUntilTarget });
+  }
+  // Handle monthly frequency - find the next occurrence of the specified day
+  else if (frequency === "monthly" && dayOfMonth !== undefined) {
+    const currentDay = nextRunInUserTz.getDate();
+    const currentMonth = nextRunInUserTz.getMonth();
+    const currentYear = nextRunInUserTz.getFullYear();
+
+    // Get the last day of the current month
+    const lastDayOfCurrentMonth = new Date(
+      currentYear,
+      currentMonth + 1,
+      0
+    ).getDate();
+    const targetDay = Math.min(dayOfMonth, lastDayOfCurrentMonth);
+
+    // Check if we can still run this month
+    if (
+      currentDay < targetDay ||
+      (currentDay === targetDay && isAfter(nextRunInUserTz, nowInUserTz))
+    ) {
+      nextRunInUserTz = set(nextRunInUserTz, { date: targetDay });
+    } else {
+      // Move to next month
+      const nextMonth = currentMonth + 1;
+      const nextMonthYear = nextMonth > 11 ? currentYear + 1 : currentYear;
+      const actualNextMonth = nextMonth > 11 ? 0 : nextMonth;
+      const lastDayOfNextMonth = new Date(
+        nextMonthYear,
+        actualNextMonth + 1,
+        0
+      ).getDate();
+      const nextTargetDay = Math.min(dayOfMonth, lastDayOfNextMonth);
+
+      nextRunInUserTz = set(nextRunInUserTz, {
+        year: nextMonthYear,
+        month: actualNextMonth,
+        date: nextTargetDay,
+      });
+    }
+  }
+
+  // Daily frequency - just ensure we're in the future
+  // Final check - ensure we're in the future
+  while (!isAfter(nextRunInUserTz, nowInUserTz)) {
     nextRunInUserTz = addFrequencyPeriod(nextRunInUserTz, frequency);
   }
 
-  // Apply frequency rules - ensure we're in the future
-  while (!isAfter(nextRunInUserTz, nowInUserTz)) {
+  // If forceNextRun is true, move to the next run
+  if (forceNextRun) {
     nextRunInUserTz = addFrequencyPeriod(nextRunInUserTz, frequency);
   }
 
@@ -429,10 +489,12 @@ const routes: FastifyPluginAsync = async (app) => {
           ...request.projectInfo,
           userId,
           status: "draft", // New projects start as draft
-          nextRunAt: calculateNextRunAt(
+          nextRunAt: calculateNewRunAt(
             request.projectInfo.frequency,
             request.projectInfo.deliveryTime,
-            request.projectInfo.timezone
+            request.projectInfo.timezone,
+            request.projectInfo.dayOfWeek,
+            request.projectInfo.dayOfMonth
           ),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -478,6 +540,13 @@ const routes: FastifyPluginAsync = async (app) => {
     return snapshot.docs[0];
   };
 
+  /**
+   * Update a user's project settings.
+   * Special handling is performed if the project schedule (frequency, delivery time, etc.) is modified:
+   * 1. Validates that the new schedule complies with the user's plan limits (max daily runs).
+   * 2. Recalculates the `nextRunAt` timestamp.
+   * 3. Prevents updates if the new run time is too close to the current time (within ~16 mins window) to avoid scheduling conflicts.
+   */
   app.post(
     "/update",
     { preHandler: [app.rlPerRoute(10)] },
@@ -505,66 +574,85 @@ const routes: FastifyPluginAsync = async (app) => {
           updatedAt: new Date().toISOString(),
         };
 
-        if (data.deliveryTime || data.frequency || data.timezone) {
-          //const analytics = await getUserAnalytics(db, userId);
+        // Check if any schedule-related fields are being updated
+        const isScheduleChanged =
+          data.deliveryTime ||
+          data.frequency ||
+          data.timezone ||
+          data.dayOfWeek ||
+          data.dayOfMonth;
 
-          const frequency = data.frequency || docData.frequency;
-          const deliveryTime = data.deliveryTime || docData.deliveryTime;
-          const timezone = data.timezone || docData.timezone;
+        if (isScheduleChanged && docData.status === "active") {
+          // Fetch all user projects to validate against plan limits
+          let projects: ProjectInfo[] | null =
+            await getAllUserProjectsFromCache(app, userId);
 
-          const now = Date.now();
-          const currentUtcTime = fromZonedTime(now, "UTC").getTime();
-
-          const newDeliveryTime = fromZonedTime(
-            new Date(deliveryTime),
-            timezone
-          ).getTime();
-
-          const currentNextRunAt = new Date(docData.nextRunAt);
-
-          // check dates to check if project already ran for today
-          const projectAlreadyRanForToday =
-            currentNextRunAt.getDate() > new Date(Date.now()).getDate();
-          // check if new delivery time is less than current utc time -- meaning we have to run tomorrow..
-          const shouldCalculateNextRunAt = newDeliveryTime < currentUtcTime;
-          // check if new delivery time is +16 mins from current utc time
-          const projectWithinDeliveryWindow =
-            !projectAlreadyRanForToday &&
-            !shouldCalculateNextRunAt &&
-            newDeliveryTime - currentUtcTime > 16 * 60 * 1000;
-
-          let newNextRunAt = null;
-
-          // if the project already ran for today, we calculate the next run at
-          if (shouldCalculateNextRunAt || projectAlreadyRanForToday) {
-            newNextRunAt = calculateNextRunAt(
-              frequency,
-              deliveryTime,
-              timezone
+          if (projects) {
+            projects = projects?.filter(
+              (project) => project.status === "active"
             );
-          }
 
-          if (projectWithinDeliveryWindow) {
-            newNextRunAt = newDeliveryTime;
-          }
+            // Temporarily update the current project in the list to test the new schedule configuration
+            for (let project of projects) {
+              if (project.title === title) {
+                project.frequency = data.frequency || docData.frequency;
+                project.deliveryTime =
+                  data.deliveryTime || docData.deliveryTime;
+                project.timezone = data.timezone || docData.timezone;
+                project.dayOfWeek = data.dayOfWeek || docData.dayOfWeek;
+                project.dayOfMonth = data.dayOfMonth || docData.dayOfMonth;
+                break;
+              }
+            }
 
-          if (newNextRunAt) {
-            updates.nextRunAt = newNextRunAt;
-
-            app.log.info(
-              `Updating project ${title}, prevNextRunAt: ${new Date(
-                docData.nextRunAt
-              ).toISOString()}, newNextRunAt: ${new Date(
-                newNextRunAt
-              ).toISOString()}`
+            const userData = await getUserData(userId, db);
+            const plans: Plan[] = await getPlans(db);
+            const plan: Plan | undefined = plans.find(
+              (plan) => plan.id === userData.user.planId
             );
-          } else {
-            return rep.status(400).send({
-              error: {
-                message:
-                  "Failed to update project. The delivery time cannot be updated at same time as the project ran. Please check the delivery time and try again.",
-              },
-            });
+
+            // Validate that the new schedule allows the user to stay within their plan's limits
+            if (plan && validateActiveProjects(plan, projects)) {
+              const userAnalytics: AnalyticsDocument | null =
+                await getUserAnalytics(db, userId);
+
+              const forceNextRun =
+                userAnalytics?.num_completed_daily_research_projects.find(
+                  (item) => item === title
+                );
+
+              // Calculate the next run time based on the new schedule
+              const newRunAt = calculateNewRunAt(
+                data.frequency || docData.frequency,
+                data.deliveryTime || docData.deliveryTime,
+                data.timezone || docData.timezone,
+                data.dayOfWeek || docData.dayOfWeek,
+                data.dayOfMonth || docData.dayOfMonth,
+                forceNextRun !== undefined
+              );
+
+              const now = Date.now();
+              const currentUtcTime = fromZonedTime(now, "UTC").getTime();
+
+              // Ensure we don't schedule a run too close to the current time (16 minute buffer)
+              const projectWithinDeliveryWindow =
+                newRunAt - currentUtcTime > 16 * 60 * 1000;
+              if (projectWithinDeliveryWindow) {
+                updates.nextRunAt = newRunAt;
+              } else {
+                return rep.status(400).send({
+                  error: {
+                    message: `Failed to update project. Please refrain from updating the project schedule too close to the current time (~16 min window).`,
+                  },
+                });
+              }
+            } else {
+              return rep.status(400).send({
+                error: {
+                  message: `Failed to update project. Delivery settings are not valid. Please make sure settings align with your plan (max daily runs: ${plan?.settingsMaxDailyRuns}).`,
+                },
+              });
+            }
           }
         }
 
@@ -619,6 +707,14 @@ const routes: FastifyPluginAsync = async (app) => {
     }
   );
 
+  /**
+   * Toggle the status of a project (e.g., from "paused" to "active" or vice-versa).
+   * Key logic:
+   * 1. Checks if the project exists and belongs to the user.
+   * 2. Prevents toggling if the project is currently "running" or in an "error" state.
+   * 3. When activating a project ("active"), it validates that the user has not exceeded their plan's max daily runs.
+   * 4. Updates the project status in Firestore if all checks pass.
+   */
   app.post(
     "/toggle-status",
     { preHandler: [app.rlPerRoute(10)] },
@@ -635,6 +731,7 @@ const routes: FastifyPluginAsync = async (app) => {
             .status(400)
             .send({ error: { message: "Title is required" } });
 
+        // Retrieve current projects to check status and limits
         const projects: ProjectInfo[] | null =
           await getAllUserProjectsFromCache(app, userId, 60 * 5);
         const activeProjects = projects?.filter(
@@ -659,11 +756,14 @@ const routes: FastifyPluginAsync = async (app) => {
         let errorCode = "";
         let errorMessage = "";
 
+        // Prevent toggling if project is in a transient or error state
         const allowToggle = nStatus !== "running" && nStatus !== "error";
         if (!allowToggle) {
           errorCode = "invalid_status";
           errorMessage = "Invalid status";
         }
+
+        // If attempting to activate, we must validate plan limits
         const activateNewProject = status === "active" && allowToggle;
         if (activateNewProject) {
           const userData = await getUserData(userId, db);
@@ -672,7 +772,7 @@ const routes: FastifyPluginAsync = async (app) => {
             app.stripe
           );
 
-          // find the users correct plan.. if not on a plan assume they are on free mode
+          // Find the user's correct plan.. if not on a plan assume they are on free mode
           const plans: Plan[] = await getPlans(remoteConfig);
           let plan: Plan | undefined = plans.find(
             (p) => p.infoName === "Free Trial"
@@ -680,7 +780,9 @@ const routes: FastifyPluginAsync = async (app) => {
           if (isSubscribed) {
             plan = plans.find((p) => p.id === userData.user.planId);
           }
+
           if (plan) {
+            // Simulate adding this project to the active list to check limits
             let newActivatedProjects: ProjectInfo[] = activeProjects
               ? [...activeProjects]
               : [];
@@ -708,6 +810,7 @@ const routes: FastifyPluginAsync = async (app) => {
           nStatus = "paused";
         }
 
+        // Apply update if status has changed
         if (nStatus !== cStatus) {
           app.log.info("Updating project status to " + nStatus);
           await db

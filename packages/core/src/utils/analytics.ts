@@ -6,12 +6,15 @@ export const kAnalyticsCollectionTopDown = (dateKey: string) =>
 export const kAnalyticsUserCollection = (userId: string, dateKey: string) =>
   `users/${userId}/analytics/v1/${dateKey}`;
 
+export const kAnalyticsDailyDateKey = (date: Date): string =>
+  date.toISOString().substring(0, 10);
+
 export const getUserAnalytics = async (
   db: any,
   userId: string,
   dateKey?: string
 ): Promise<AnalyticsDocument | null> => {
-  dateKey = dateKey || new Date().toISOString().substring(0, 10);
+  dateKey = dateKey || kAnalyticsDailyDateKey(new Date());
   const docRef = db.doc(kAnalyticsUserCollection(userId, dateKey));
   const doc = await docRef.get();
   if (doc.exists) {

@@ -6,19 +6,27 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
       "default": "./dist/index.js"
     },
     "./backend": {
-      "import": "./src/index-backend.ts",
+      "types": "./dist/index-backend.d.ts",
+      "import": "./dist/index-backend.js",
+      "require": "./dist/index-backend.js",
       "default": "./dist/index-backend.js"
     },
     "./web": {
-      "import": "./src/index-web.ts",
+      "types": "./dist/index-web.d.ts",
+      "import": "./dist/index-web.js",
+      "require": "./dist/index-web.js",
       "default": "./dist/index-web.js"
     },
     "./utils": {
-      "import": "./src/utils/index.ts",
+      "types": "./dist/utils/index.d.ts",
+      "import": "./dist/utils/index.js",
+      "require": "./dist/utils/index.js",
       "default": "./dist/utils/index.js"
     }
   },
