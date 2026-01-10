@@ -18,7 +18,7 @@ import { Select } from "@/components/ui/select";
 import { TimePicker } from "@/components/ui/time-picker";
 import { DayOfWeekPicker } from "@/components/ui/day-of-week-picker";
 import { DayOfMonthPicker } from "@/components/ui/day-of-month-picker";
-import { Sparkles, Calendar } from "lucide-react";
+import { Sparkles, Calendar, ChevronDown, Settings } from "lucide-react";
 import { useProjects } from "@/hooks/use-projects";
 
 interface CreateProjectDialogProps {
@@ -49,6 +49,7 @@ export function CreateProjectDialog({
   const [excludedKeywords, setExcludedKeywords] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Helper function to parse comma-separated or newline-separated values
   const parseList = (value: string): string[] => {
@@ -330,75 +331,101 @@ export function CreateProjectDialog({
               </div>
             </div>
 
-            {/* Priority Domains */}
-            <div className="space-y-2">
-              <Label htmlFor="priorityDomains">Priority Domains</Label>
-              <Textarea
-                id="priorityDomains"
-                placeholder="e.g., example.com, news.site.com"
-                value={priorityDomains}
-                onChange={(e) => setPriorityDomains(e.target.value)}
-                disabled={isCreating}
-                rows={2}
-              />
-              <p className="text-xs text-muted-foreground">
-                Domains to prioritize in search results (one per line or
-                comma-separated). We will prioritize content from these domains.
-              </p>
-            </div>
+            {/* Advanced Settings Collapsible */}
+            <div className="rounded-lg border border-border bg-muted/30">
+              <button
+                type="button"
+                onClick={() => setAdvancedOpen(!advancedOpen)}
+                className="w-full flex items-center justify-between p-4 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors rounded-lg"
+              >
+                <div className="flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-muted-foreground" />
+                  Advanced Settings
+                </div>
+                <ChevronDown
+                  className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${
+                    advancedOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
 
-            {/* Excluded Domains */}
-            <div className="space-y-2">
-              <Label htmlFor="excludedDomains">Excluded Domains</Label>
-              <Textarea
-                id="excludedDomains"
-                placeholder="e.g., spam-site.com, unreliable.com"
-                value={excludedDomains}
-                onChange={(e) => setExcludedDomains(e.target.value)}
-                disabled={isCreating}
-                rows={2}
-              />
-              <p className="text-xs text-muted-foreground">
-                Domains to exclude from search results (one per line or
-                comma-separated). Results from these domains will be filtered
-                out.
-              </p>
-            </div>
+              {advancedOpen && (
+                <div className="px-4 pb-4 space-y-4 border-t border-border pt-4">
+                  {/* Priority Domains */}
+                  <div className="space-y-2">
+                    <Label htmlFor="priorityDomains">Priority Domains</Label>
+                    <Textarea
+                      id="priorityDomains"
+                      placeholder="e.g., example.com, news.site.com"
+                      value={priorityDomains}
+                      onChange={(e) => setPriorityDomains(e.target.value)}
+                      disabled={isCreating}
+                      rows={2}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Domains to prioritize in search results (one per line or
+                      comma-separated). We will prioritize content from these
+                      domains.
+                    </p>
+                  </div>
 
-            {/* Required Keywords */}
-            <div className="space-y-2">
-              <Label htmlFor="requiredKeywords">Keywords to Search For</Label>
-              <Textarea
-                id="requiredKeywords"
-                placeholder="e.g., machine learning, neural networks, AI"
-                value={requiredKeywords}
-                onChange={(e) => setRequiredKeywords(e.target.value)}
-                disabled={isCreating}
-                rows={2}
-              />
-              <p className="text-xs text-muted-foreground">
-                Keywords to include in searches to improve result quality (one
-                per line or comma-separated). These will be used to enhance
-                search queries.
-              </p>
-            </div>
+                  {/* Excluded Domains */}
+                  <div className="space-y-2">
+                    <Label htmlFor="excludedDomains">Excluded Domains</Label>
+                    <Textarea
+                      id="excludedDomains"
+                      placeholder="e.g., spam-site.com, unreliable.com"
+                      value={excludedDomains}
+                      onChange={(e) => setExcludedDomains(e.target.value)}
+                      disabled={isCreating}
+                      rows={2}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Domains to exclude from search results (one per line or
+                      comma-separated). Results from these domains will be
+                      filtered out.
+                    </p>
+                  </div>
 
-            {/* Excluded Keywords */}
-            <div className="space-y-2">
-              <Label htmlFor="excludedKeywords">Excluded Keywords</Label>
-              <Textarea
-                id="excludedKeywords"
-                placeholder="e.g., advertisement, sponsored, clickbait"
-                value={excludedKeywords}
-                onChange={(e) => setExcludedKeywords(e.target.value)}
-                disabled={isCreating}
-                rows={2}
-              />
-              <p className="text-xs text-muted-foreground">
-                Keywords to exclude from results (one per line or
-                comma-separated). Content containing these keywords will be
-                filtered out.
-              </p>
+                  {/* Required Keywords */}
+                  <div className="space-y-2">
+                    <Label htmlFor="requiredKeywords">
+                      Keywords to Search For
+                    </Label>
+                    <Textarea
+                      id="requiredKeywords"
+                      placeholder="e.g., machine learning, neural networks, AI"
+                      value={requiredKeywords}
+                      onChange={(e) => setRequiredKeywords(e.target.value)}
+                      disabled={isCreating}
+                      rows={2}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Keywords to include in searches to improve result quality
+                      (one per line or comma-separated). These will be used to
+                      enhance search queries.
+                    </p>
+                  </div>
+
+                  {/* Excluded Keywords */}
+                  <div className="space-y-2">
+                    <Label htmlFor="excludedKeywords">Excluded Keywords</Label>
+                    <Textarea
+                      id="excludedKeywords"
+                      placeholder="e.g., advertisement, sponsored, clickbait"
+                      value={excludedKeywords}
+                      onChange={(e) => setExcludedKeywords(e.target.value)}
+                      disabled={isCreating}
+                      rows={2}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Keywords to exclude from results (one per line or
+                      comma-separated). Content containing these keywords will
+                      be filtered out.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
