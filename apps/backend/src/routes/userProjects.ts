@@ -49,14 +49,16 @@ function addFrequencyPeriod(date: Date, frequency: Frequency): Date {
  * @param frequency - daily, weekly, or monthly
  * @param deliveryTime - HH:MM format in user's timezone
  * @param timezone - IANA timezone identifier (e.g., "America/New_York")
- * @param lastRunAt - Optional timestamp of last execution
+ * @param dayOfWeek - 0-6 (Sunday-Saturday), used when frequency is "weekly"
+ * @param dayOfMonth - 1-31, used when frequency is "monthly"
  * @returns Timestamp (milliseconds) for next execution
  */
 function calculateNextRunAt(
   frequency: Frequency,
   deliveryTime: string,
-  timezone: string
-  // lastRunAt?: number
+  timezone: string,
+  dayOfWeek?: number,
+  dayOfMonth?: number
 ): number {
   // Parse delivery time
   const [hours, minutes] = deliveryTime.split(":").map(Number);
@@ -75,12 +77,68 @@ function calculateNextRunAt(
     milliseconds: 0,
   });
 
-  // If we've already passed the delivery time today, move to the next period
-  if (!isAfter(nextRunInUserTz, nowInUserTz)) {
-    nextRunInUserTz = addFrequencyPeriod(nextRunInUserTz, frequency);
+  // Handle weekly frequency - find the next occurrence of the specified day
+  if (frequency === "weekly" && dayOfWeek !== undefined) {
+    const currentDayOfWeek = nextRunInUserTz.getDay();
+    let daysUntilTarget = dayOfWeek - currentDayOfWeek;
+
+    // If today is the target day but time has passed, or if target day is earlier in week
+    if (
+      daysUntilTarget < 0 ||
+      (daysUntilTarget === 0 && !isAfter(nextRunInUserTz, nowInUserTz))
+    ) {
+      daysUntilTarget += 7;
+    }
+
+    nextRunInUserTz = add(nextRunInUserTz, { days: daysUntilTarget });
+  }
+  // Handle monthly frequency - find the next occurrence of the specified day
+  else if (frequency === "monthly" && dayOfMonth !== undefined) {
+    const currentDay = nextRunInUserTz.getDate();
+    const currentMonth = nextRunInUserTz.getMonth();
+    const currentYear = nextRunInUserTz.getFullYear();
+
+    // Get the last day of the current month
+    const lastDayOfCurrentMonth = new Date(
+      currentYear,
+      currentMonth + 1,
+      0
+    ).getDate();
+    const targetDay = Math.min(dayOfMonth, lastDayOfCurrentMonth);
+
+    // Check if we can still run this month
+    if (
+      currentDay < targetDay ||
+      (currentDay === targetDay && isAfter(nextRunInUserTz, nowInUserTz))
+    ) {
+      nextRunInUserTz = set(nextRunInUserTz, { date: targetDay });
+    } else {
+      // Move to next month
+      const nextMonth = currentMonth + 1;
+      const nextMonthYear = nextMonth > 11 ? currentYear + 1 : currentYear;
+      const actualNextMonth = nextMonth > 11 ? 0 : nextMonth;
+      const lastDayOfNextMonth = new Date(
+        nextMonthYear,
+        actualNextMonth + 1,
+        0
+      ).getDate();
+      const nextTargetDay = Math.min(dayOfMonth, lastDayOfNextMonth);
+
+      nextRunInUserTz = set(nextRunInUserTz, {
+        year: nextMonthYear,
+        month: actualNextMonth,
+        date: nextTargetDay,
+      });
+    }
+  }
+  // Daily frequency - just ensure we're in the future
+  else {
+    if (!isAfter(nextRunInUserTz, nowInUserTz)) {
+      nextRunInUserTz = addFrequencyPeriod(nextRunInUserTz, frequency);
+    }
   }
 
-  // Apply frequency rules - ensure we're in the future
+  // Final check - ensure we're in the future
   while (!isAfter(nextRunInUserTz, nowInUserTz)) {
     nextRunInUserTz = addFrequencyPeriod(nextRunInUserTz, frequency);
   }
@@ -387,7 +445,9 @@ const routes: FastifyPluginAsync = async (app) => {
           nextRunAt: calculateNextRunAt(
             request.projectInfo.frequency,
             request.projectInfo.deliveryTime,
-            request.projectInfo.timezone
+            request.projectInfo.timezone,
+            request.projectInfo.dayOfWeek,
+            request.projectInfo.dayOfMonth
           ),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),

@@ -72,6 +72,8 @@ export interface Project {
   // Scheduling configuration
   deliveryTime: string; // HH:MM format (24-hour), any minute value, e.g., "09:15", "14:37", "23:42"
   timezone: string; // IANA timezone identifier, e.g., "America/New_York", "Europe/London"
+  dayOfWeek?: number; // 0-6 (Sunday-Saturday), used when frequency is "weekly"
+  dayOfMonth?: number; // 1-31, used when frequency is "monthly"
 
   // Search configuration
   searchParameters?: SearchParameters;
@@ -95,11 +97,7 @@ export interface Project {
   updatedAt: string;
 }
 
-export interface ProjectInfo extends Omit<
-  Project,
-  | "id"
-  | "userId"
-> { }
+export interface ProjectInfo extends Omit<Project, "id" | "userId"> {}
 
 /**
  * Project data needed to create a new project
@@ -114,7 +112,7 @@ export interface NewProject
     | "lastRunAt"
     | "nextRunAt"
     | "lastError"
-  > { }
+  > {}
 
 export interface ListProjectsResponse {
   projects: ProjectInfo[];

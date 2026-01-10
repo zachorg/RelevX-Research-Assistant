@@ -15,7 +15,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { Settings } from "lucide-react";
+import { TimePicker } from "@/components/ui/time-picker";
+import { DayOfWeekPicker } from "@/components/ui/day-of-week-picker";
+import { DayOfMonthPicker } from "@/components/ui/day-of-month-picker";
+import { Settings, Calendar } from "lucide-react";
 import { useProjects } from "@/hooks/use-projects";
 
 interface EditProjectSettingsDialogProps {
@@ -34,6 +37,8 @@ export function EditProjectSettingsDialog({
   const [title, setTitle] = useState(project.title);
   const [description, setDescription] = useState(project.description);
   const [frequency, setFrequency] = useState<Frequency>(project.frequency);
+  const [dayOfWeek, setDayOfWeek] = useState<number>(project.dayOfWeek ?? 1); // Monday
+  const [dayOfMonth, setDayOfMonth] = useState<number>(project.dayOfMonth ?? 1); // 1st of month
   const [resultsDestination, setResultsDestination] =
     useState<ResultsDestination>(project.resultsDestination);
   const [deliveryTime, setDeliveryTime] = useState(
@@ -69,6 +74,8 @@ export function EditProjectSettingsDialog({
       setTitle(project.title);
       setDescription(project.description);
       setFrequency(project.frequency);
+      setDayOfWeek(project.dayOfWeek ?? 1);
+      setDayOfMonth(project.dayOfMonth ?? 1);
       setResultsDestination(project.resultsDestination);
       setDeliveryTime(project.deliveryTime || "09:00");
       setTimezone(
@@ -148,6 +155,12 @@ export function EditProjectSettingsDialog({
         resultsDestination,
         deliveryTime,
         timezone,
+        ...(frequency === "weekly" && { dayOfWeek }),
+        ...(frequency === "monthly" && { dayOfMonth }),
+        // Clear the other day field when switching frequencies
+        ...(frequency === "daily" && { dayOfWeek: null, dayOfMonth: null }),
+        ...(frequency === "weekly" && { dayOfMonth: null }),
+        ...(frequency === "monthly" && { dayOfWeek: null }),
       };
 
       // Only include searchParameters if it has any properties or we need to clear it
@@ -178,8 +191,6 @@ export function EditProjectSettingsDialog({
       onOpenChange(newOpen);
     }
   };
-
-
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -232,22 +243,109 @@ export function EditProjectSettingsDialog({
               </p>
             </div>
 
-            {/* Frequency */}
-            <div className="space-y-2">
-              <Label htmlFor="edit-frequency">Research Frequency</Label>
-              <Select
-                id="edit-frequency"
-                value={frequency}
-                onChange={(e) => setFrequency(e.target.value as Frequency)}
-                disabled={isUpdating}
-              >
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                How often should we search for new information?
-              </p>
+            {/* Schedule Card */}
+            <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                Schedule
+              </div>
+
+              {/* Frequency */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-frequency">Frequency</Label>
+                <Select
+                  id="edit-frequency"
+                  value={frequency}
+                  onChange={(e) => setFrequency(e.target.value as Frequency)}
+                  disabled={isUpdating}
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </Select>
+              </div>
+
+              {/* Scheduling Options Row */}
+              <div className="flex flex-wrap items-start gap-4">
+                {/* Day of Week (for weekly frequency) */}
+                {frequency === "weekly" && (
+                  <div className="space-y-2">
+                    <Label>Day of Week</Label>
+                    <DayOfWeekPicker
+                      value={dayOfWeek}
+                      onChange={setDayOfWeek}
+                      disabled={isUpdating}
+                    />
+                  </div>
+                )}
+
+                {/* Day of Month (for monthly frequency) */}
+                {frequency === "monthly" && (
+                  <div className="space-y-2">
+                    <Label>Day of Month</Label>
+                    <DayOfMonthPicker
+                      value={dayOfMonth}
+                      onChange={setDayOfMonth}
+                      disabled={isUpdating}
+                    />
+                  </div>
+                )}
+
+                {/* Placeholder for daily to maintain consistent layout */}
+                {frequency === "daily" && (
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Repeats</Label>
+                    <div className="h-[120px] w-32 flex items-center justify-center text-sm text-muted-foreground bg-muted/50 rounded-md border border-dashed border-border">
+                      Every day
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Time</Label>
+                  <TimePicker
+                    value={deliveryTime}
+                    onChange={setDeliveryTime}
+                    disabled={isUpdating}
+                  />
+                </div>
+
+                <div className="space-y-2 flex-1 min-w-[180px]">
+                  <Label htmlFor="edit-timezone">Timezone</Label>
+                  <Select
+                    id="edit-timezone"
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                    disabled={isUpdating}
+                  >
+                    <option value="America/New_York">Eastern Time (ET)</option>
+                    <option value="America/Chicago">Central Time (CT)</option>
+                    <option value="America/Denver">Mountain Time (MT)</option>
+                    <option value="America/Los_Angeles">
+                      Pacific Time (PT)
+                    </option>
+                    <option value="America/Anchorage">Alaska Time (AKT)</option>
+                    <option value="Pacific/Honolulu">Hawaii Time (HT)</option>
+                    <option value="Europe/London">London (GMT/BST)</option>
+                    <option value="Europe/Paris">Paris (CET/CEST)</option>
+                    <option value="Europe/Berlin">Berlin (CET/CEST)</option>
+                    <option value="Asia/Tokyo">Tokyo (JST)</option>
+                    <option value="Asia/Shanghai">Shanghai (CST)</option>
+                    <option value="Asia/Hong_Kong">Hong Kong (HKT)</option>
+                    <option value="Asia/Singapore">Singapore (SGT)</option>
+                    <option value="Asia/Dubai">Dubai (GST)</option>
+                    <option value="Asia/Kolkata">India (IST)</option>
+                    <option value="Australia/Sydney">Sydney (AEDT/AEST)</option>
+                    <option value="Australia/Melbourne">
+                      Melbourne (AEDT/AEST)
+                    </option>
+                    <option value="Pacific/Auckland">
+                      Auckland (NZDT/NZST)
+                    </option>
+                    <option value="UTC">UTC</option>
+                  </Select>
+                </div>
+              </div>
             </div>
 
             {/* Results Destination */}
@@ -269,58 +367,6 @@ export function EditProjectSettingsDialog({
               <p className="text-xs text-muted-foreground">
                 Where should we send your research updates?
               </p>
-            </div>
-
-            {/* Delivery Time and Timezone */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-deliveryTime">Delivery Time</Label>
-                <Input
-                  id="edit-deliveryTime"
-                  type="time"
-                  value={deliveryTime}
-                  onChange={(e) => setDeliveryTime(e.target.value)}
-                  disabled={isUpdating}
-                />
-                <p className="text-xs text-muted-foreground">
-                  What time should we deliver your research updates?
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-timezone">Timezone</Label>
-                <Select
-                  id="edit-timezone"
-                  value={timezone}
-                  onChange={(e) => setTimezone(e.target.value)}
-                  disabled={isUpdating}
-                >
-                  <option value="America/New_York">Eastern Time (ET)</option>
-                  <option value="America/Chicago">Central Time (CT)</option>
-                  <option value="America/Denver">Mountain Time (MT)</option>
-                  <option value="America/Los_Angeles">Pacific Time (PT)</option>
-                  <option value="America/Anchorage">Alaska Time (AKT)</option>
-                  <option value="Pacific/Honolulu">Hawaii Time (HT)</option>
-                  <option value="Europe/London">London (GMT/BST)</option>
-                  <option value="Europe/Paris">Paris (CET/CEST)</option>
-                  <option value="Europe/Berlin">Berlin (CET/CEST)</option>
-                  <option value="Asia/Tokyo">Tokyo (JST)</option>
-                  <option value="Asia/Shanghai">Shanghai (CST)</option>
-                  <option value="Asia/Hong_Kong">Hong Kong (HKT)</option>
-                  <option value="Asia/Singapore">Singapore (SGT)</option>
-                  <option value="Asia/Dubai">Dubai (GST)</option>
-                  <option value="Asia/Kolkata">India (IST)</option>
-                  <option value="Australia/Sydney">Sydney (AEDT/AEST)</option>
-                  <option value="Australia/Melbourne">
-                    Melbourne (AEDT/AEST)
-                  </option>
-                  <option value="Pacific/Auckland">Auckland (NZDT/NZST)</option>
-                  <option value="UTC">UTC</option>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Select your timezone for accurate scheduling
-                </p>
-              </div>
             </div>
 
             {/* Priority Domains */}

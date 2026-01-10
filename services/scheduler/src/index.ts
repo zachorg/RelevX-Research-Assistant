@@ -402,8 +402,9 @@ async function runResearchJob(): Promise<void> {
         const nextRunAt = calculateNextRunAt(
           project.frequency,
           project.deliveryTime,
-          project.timezone
-          // Date.now()
+          project.timezone,
+          project.dayOfWeek,
+          project.dayOfMonth
         );
 
         projectUpdates = {
@@ -646,8 +647,9 @@ async function runDeliveryQueue() {
             const nextRunAt = calculateNextRunAt(
               project.frequency,
               project.deliveryTime,
-              project.timezone
-              // now
+              project.timezone,
+              project.dayOfWeek,
+              project.dayOfMonth
             );
 
             // Update project
