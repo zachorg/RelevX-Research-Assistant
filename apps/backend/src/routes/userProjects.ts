@@ -90,21 +90,18 @@ function calculateNextRunAt(
 }
 
 export function validateActiveProjects(plan: Plan, projects: ProjectInfo[]) {
-  console.log("projects", JSON.stringify(projects, null, 2));
   // Go through all the projects in 'docs' and count the max number of daily runs happening in a 30-Day period
   const maxDailyRuns = plan.settingsMaxDailyRuns;
   let totalDailyRuns = 0;
-  let weekly: Record<string, number> = {};
-  let monthly: Record<string, number> = {};
+  let weekly: Record<number, number> = {};
+  let monthly: Record<number, number> = {};
 
   projects.forEach((project) => {
     if (project.frequency === "daily") totalDailyRuns++;
-    if (project.dayOfWeek)
-      weekly[project.dayOfWeek] =
-        (weekly[project.dayOfWeek] || totalDailyRuns) + 1;
-    if (project.dayOfMonth)
-      monthly[project.dayOfMonth] =
-        (monthly[project.dayOfMonth] || totalDailyRuns) + 1;
+    if (project.dayOfWeek !== undefined)
+      weekly[project.dayOfWeek] = (weekly[project.dayOfWeek] || 0) + 1;
+    if (project.dayOfMonth !== undefined)
+      monthly[project.dayOfMonth] = (monthly[project.dayOfMonth] || 0) + 1;
   });
 
   const maxAllowedDailyRuns = maxDailyRuns - totalDailyRuns;
@@ -113,18 +110,18 @@ export function validateActiveProjects(plan: Plan, projects: ProjectInfo[]) {
   }
 
   weekly = Object.fromEntries(
-    Object.entries(weekly).filter(([_, v]) => v > maxDailyRuns)
+    Object.entries(weekly).filter(([_, v]) => v + totalDailyRuns > maxDailyRuns)
   );
-  console.log("weekly", JSON.stringify(weekly, null, 2));
 
   if (Object.keys(weekly).length > 0) {
     return false;
   }
 
   monthly = Object.fromEntries(
-    Object.entries(monthly).filter(([_, v]) => v > maxDailyRuns)
+    Object.entries(monthly).filter(
+      ([_, v]) => v + totalDailyRuns > maxDailyRuns
+    )
   );
-  console.log("monthly", JSON.stringify(monthly, null, 2));
 
   if (Object.keys(monthly).length > 0) {
     return false;
@@ -426,7 +423,7 @@ const routes: FastifyPluginAsync = async (app) => {
           });
         }
 
-        const projectData = {
+        const projectData: any = {
           ...request.projectInfo,
           userId,
           status: "draft", // New projects start as draft

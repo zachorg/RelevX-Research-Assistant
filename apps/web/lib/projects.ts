@@ -43,6 +43,8 @@ export async function createProject(data: NewProject): Promise<ProjectInfo> {
       searchParameters: data.searchParameters,
       settings,
       deliveryConfig: data.deliveryConfig,
+      dayOfWeek: data.dayOfWeek,
+      dayOfMonth: data.dayOfMonth,
     };
     const request: CreateProjectRequest = {
       projectInfo: projectData,

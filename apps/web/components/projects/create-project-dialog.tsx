@@ -107,20 +107,30 @@ export function CreateProjectDialog({
         searchParameters.excludedKeywords = excludedKeywordsList;
       }
 
-      await createProject({
+      const cprojectinfo: any =
+      {
         title: title.trim(),
         description: description.trim(),
         frequency,
         resultsDestination: "email",
         deliveryTime,
         timezone,
-        ...(frequency === "weekly" && { dayOfWeek }),
-        ...(frequency === "monthly" && { dayOfMonth }),
         settings: {
           relevancyThreshold: 60,
           minResults: 5,
           maxResults: 20,
-        },
+        }
+      };
+
+      if (frequency === "weekly") {
+        cprojectinfo.dayOfWeek = dayOfWeek;
+      }
+      if (frequency === "monthly") {
+        cprojectinfo.dayOfMonth = dayOfMonth;
+      }
+
+      await createProject({
+        ...cprojectinfo,
         ...(Object.keys(searchParameters).length > 0 && { searchParameters }),
       });
 
@@ -343,9 +353,8 @@ export function CreateProjectDialog({
                   Advanced Settings
                 </div>
                 <ChevronDown
-                  className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${
-                    advancedOpen ? "rotate-180" : ""
-                  }`}
+                  className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${advancedOpen ? "rotate-180" : ""
+                    }`}
                 />
               </button>
 
