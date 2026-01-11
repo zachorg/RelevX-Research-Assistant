@@ -72,11 +72,32 @@ export interface ResultForReport {
 export interface CompiledReport {
   markdown: string;
   title: string;
-  summary: string; // Executive summary
+  summary: string; // Summary
   resultCount: number;
   averageScore: number;
 }
 
-export interface ClientReport extends Omit<CompiledReport, "summary" | "resultCount" | "averageScore"> {
+export interface ClientReport
+  extends Omit<CompiledReport, "summary" | "resultCount" | "averageScore"> {}
 
+/**
+ * Source attribution for clustered articles
+ */
+export interface ArticleSource {
+  name: string; // Publication name (extracted from URL or title)
+  url: string;
+  publishedDate?: string;
+}
+
+/**
+ * A cluster of semantically similar articles covering the same topic/event
+ */
+export interface TopicCluster {
+  id: string;
+  topic: string; // Inferred topic/headline for the cluster
+  primaryArticle: ResultForReport; // Highest scoring article (main content source)
+  relatedArticles: ResultForReport[]; // Other articles in the cluster
+  allSources: ArticleSource[]; // Combined sources for attribution
+  combinedKeyPoints: string[]; // Merged key points from all articles
+  averageScore: number; // Average relevancy score across cluster
 }

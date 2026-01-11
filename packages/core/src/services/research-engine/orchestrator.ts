@@ -16,7 +16,13 @@ import type {
   ContentToAnalyze,
   ResultForReport,
   CompiledReport,
+  TopicCluster,
 } from "../../interfaces/llm-provider";
+import { clusterArticlesByTopic } from "../llm/topic-clustering";
+import {
+  compileClusteredReport,
+  generateReportSummaryWithRetry,
+} from "../llm/report-compilation";
 import type {
   SearchProvider,
   SearchFilters,
@@ -93,7 +99,9 @@ function getFreshnessForFrequency(
  * - pm (past month) -> py (past year)
  * - py (past year) -> undefined (no further expansion)
  */
-function getFallbackFreshness(currentFreshness: Freshness): Freshness | undefined {
+function getFallbackFreshness(
+  currentFreshness: Freshness
+): Freshness | undefined {
   switch (currentFreshness) {
     case "pd":
       return "pw"; // Expand from day to week
@@ -188,9 +196,13 @@ export async function executeResearchForProject(
     };
 
     // 5.1 Determine initial freshness based on project frequency
-    let currentFreshness: Freshness = getFreshnessForFrequency(project.frequency);
+    let currentFreshness: Freshness = getFreshnessForFrequency(
+      project.frequency
+    );
     console.log(
-      `Initial freshness for ${project.frequency} project: ${currentFreshness} (${describeFreshness(currentFreshness)})`
+      `Initial freshness for ${
+        project.frequency
+      } project: ${currentFreshness} (${describeFreshness(currentFreshness)})`
     );
 
     // 6. Tracking
@@ -212,7 +224,11 @@ export async function executeResearchForProject(
 
     while (iteration <= maxIterations) {
       console.log(`\n=== Research Iteration ${iteration}/${maxIterations} ===`);
-      console.log(`Using freshness: ${currentFreshness} (${describeFreshness(currentFreshness)})`);
+      console.log(
+        `Using freshness: ${currentFreshness} (${describeFreshness(
+          currentFreshness
+        )})`
+      );
 
       // 7.1 Generate search queries
       console.log("Generating search queries...");
@@ -533,13 +549,17 @@ export async function executeResearchForProject(
         const fallbackFreshness = getFallbackFreshness(currentFreshness);
         if (fallbackFreshness) {
           console.log(
-            `Not enough results with ${describeFreshness(currentFreshness)}, expanding to ${describeFreshness(fallbackFreshness)}`
+            `Not enough results with ${describeFreshness(
+              currentFreshness
+            )}, expanding to ${describeFreshness(fallbackFreshness)}`
           );
           currentFreshness = fallbackFreshness;
           freshnessExpanded = true;
         } else {
           console.log(
-            `Already at maximum freshness range (${describeFreshness(currentFreshness)}), cannot expand further`
+            `Already at maximum freshness range (${describeFreshness(
+              currentFreshness
+            )}), cannot expand further`
           );
         }
       }
@@ -557,7 +577,6 @@ export async function executeResearchForProject(
     );
 
     // 9. Compile report (if we have results)
-    // 9. Compile report (if we have results)
     let report: CompiledReport | undefined;
     if (sortedResults.length > 0) {
       console.log("Compiling report...");
@@ -573,19 +592,59 @@ export async function executeResearchForProject(
         imageAlt: r.metadata.imageAlt,
       }));
 
-      const compiledReport = await llmProvider.compileReport(
-        project.description,
-        resultsForReport,
-        {
-          tone: "professional",
-          maxLength: 5000,
-        }
+      // 9.1 Cluster articles by semantic similarity
+      console.log("Clustering articles by topic...");
+      const clusters = await clusterArticlesByTopic(resultsForReport, {
+        similarityThreshold: 0.85,
+      });
+
+      console.log(
+        `Created ${clusters.length} topic clusters from ${resultsForReport.length} articles`
       );
+
+      // 9.2 Compile report using clusters if we have any multi-article clusters
+      const hasMultiArticleClusters = clusters.some(
+        (c) => c.relatedArticles.length > 0
+      );
+
+      let compiledReport: CompiledReport;
+
+      if (hasMultiArticleClusters) {
+        // Use clustered report compilation for better consolidation
+        console.log("Using clustered report compilation...");
+        compiledReport = await compileClusteredReport({
+          clusters,
+          projectTitle: project.title,
+          projectDescription: project.description,
+          frequency: project.frequency,
+        });
+      } else {
+        // No clustering needed, use standard compilation
+        console.log("No multi-article clusters, using standard compilation...");
+        compiledReport = await llmProvider.compileReport(
+          project.description,
+          resultsForReport,
+          {
+            tone: "professional",
+            maxLength: 5000,
+            projectTitle: project.title,
+            frequency: project.frequency,
+          }
+        );
+      }
+
+      // 9.3 Generate executive summary from the compiled report
+      console.log("Generating executive summary...");
+      const executiveSummary = await generateReportSummaryWithRetry({
+        reportMarkdown: compiledReport.markdown,
+        projectTitle: project.title,
+        projectDescription: project.description,
+      });
 
       report = {
         markdown: compiledReport.markdown,
         title: compiledReport.title,
-        summary: compiledReport.summary,
+        summary: executiveSummary || compiledReport.summary,
         averageScore: compiledReport.averageScore,
         resultCount: compiledReport.resultCount,
       };

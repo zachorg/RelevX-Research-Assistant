@@ -53,7 +53,7 @@ export class GeminiProvider implements LLMProvider {
     options?: { count?: number; focusRecent?: boolean }
   ): Promise<GeneratedQuery[]> {
     const promptConfig = QUERY_GENERATION_PROMPTS;
-    
+
     // Render user prompt
     const userPrompt = renderPrompt(promptConfig.user, {
       description,
@@ -69,6 +69,7 @@ export class GeminiProvider implements LLMProvider {
         contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
         generationConfig: {
           responseMimeType: "application/json",
+          temperature: promptConfig.temperature ?? 0.7,
         },
       });
 
@@ -123,6 +124,7 @@ Snippet: ${r.description}
         contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
         generationConfig: {
           responseMimeType: "application/json",
+          temperature: promptConfig.temperature ?? 0.7,
         },
       });
 
@@ -158,11 +160,13 @@ Snippet: ${r.description}
     // Process in batches
     for (let i = 0; i < contents.length; i += batchSize) {
       const batch = contents.slice(i, i + batchSize);
-      
+
       const contentsFormatted = batch
         .map(
           (c, idx) =>
-            `Content ${idx + 1}:\nURL: ${c.url}\nTitle: ${c.title}\nSnippet: ${c.snippet}\n`
+            `Content ${idx + 1}:\nURL: ${c.url}\nTitle: ${c.title}\nSnippet: ${
+              c.snippet
+            }\n`
         )
         .join("\n---\n");
 
@@ -180,12 +184,13 @@ Snippet: ${r.description}
           contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
           generationConfig: {
             responseMimeType: "application/json",
+            temperature: promptConfig.temperature ?? 0.7,
           },
         });
 
         const responseText = result.response.text();
         const parsed = JSON.parse(responseText);
-        
+
         if (parsed.results && Array.isArray(parsed.results)) {
           // Map back to original URLs if needed, but the prompt asks for URL in result
           results.push(...parsed.results);
@@ -200,25 +205,48 @@ Snippet: ${r.description}
   }
 
   /**
+   * Format date for display in reports
+   */
+  private formatReportDate(): string {
+    return new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  /**
    * Compile report
    */
   async compileReport(
     description: string,
     results: ResultForReport[],
-    options?: { tone?: "professional" | "casual" | "technical"; maxLength?: number }
+    options?: {
+      tone?: "professional" | "casual" | "technical";
+      maxLength?: number;
+      projectTitle?: string;
+      frequency?: "daily" | "weekly" | "monthly";
+    }
   ): Promise<CompiledReport> {
     const promptConfig = REPORT_COMPILATION_PROMPTS;
-    
+    const projectTitle = options?.projectTitle || "Research Report";
+    const frequency = options?.frequency || "weekly";
+
     const resultsFormatted = results
       .map(
         (r) =>
-          `Source: ${r.title} (${r.url})\nKey Points: ${r.keyPoints.join("; ")}\nSnippet: ${r.snippet}\n`
+          `Source: ${r.title} (${r.url})\nPublished: ${
+            r.publishedDate || "Unknown"
+          }\nKey Points: ${r.keyPoints.join("; ")}\nSnippet: ${r.snippet}\n`
       )
       .join("\n\n");
 
     const userPrompt = renderPrompt(promptConfig.user, {
-      projectTitle: "Research Report",
+      projectTitle,
       projectDescription: description,
+      frequency,
+      reportDate: this.formatReportDate(),
       resultCount: results.length,
       resultsFormatted,
     });
@@ -226,13 +254,11 @@ Snippet: ${r.description}
     const fullPrompt = `${promptConfig.system}\n\n${userPrompt}`;
 
     try {
-      // Use a potentially stronger model for reporting if this instance is configured for it, 
-      // but here we use the instance's model. 
-      // For Pro tier, we might pass a different model name to constructor.
       const result = await this.model.generateContent({
         contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
         generationConfig: {
           responseMimeType: "application/json",
+          temperature: promptConfig.temperature ?? 0.7,
         },
       });
 

@@ -63,6 +63,7 @@ ${c.snippet}
   try {
     const response = await client.chat.completions.create({
       model: RELEVANCY_ANALYSIS_PROMPTS.model,
+      temperature: RELEVANCY_ANALYSIS_PROMPTS.temperature ?? 0.7,
       messages: [
         { role: "system", content: RELEVANCY_ANALYSIS_PROMPTS.system },
         { role: "user", content: userPrompt },

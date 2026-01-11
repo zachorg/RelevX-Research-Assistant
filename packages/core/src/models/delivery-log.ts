@@ -33,7 +33,7 @@ export interface DeliveryLog {
   // Report content
   reportMarkdown: string; // The compiled markdown report
   reportTitle: string; // Title of the report
-  reportSummary?: string; // Executive summary of the report
+  reportSummary?: string; // Summary of the report
 
   // Statistics
   stats: DeliveryStats;

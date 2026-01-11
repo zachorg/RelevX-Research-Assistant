@@ -53,7 +53,7 @@ async function generateEmailHTML(
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); border-radius: 12px;">
               <tr>
                 <td style="padding: 24px 28px;">
-                  <div style="font-size: 11px; font-weight: 600; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">Executive Summary</div>
+                  <div style="font-size: 11px; font-weight: 600; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">Summary</div>
                   <div style="font-size: 15px; color: #e2e8f0; line-height: 1.7;">${options.summary}</div>
                 </td>
               </tr>

@@ -31,7 +31,9 @@ async function testMockResearch() {
 
   // Test 1: Query Generation
   console.log("1. Testing Query Generation...");
-  const { generateSearchQueriesWithRetry } = await import("../packages/core/src/services/llm");
+  const { generateSearchQueriesWithRetry } = await import(
+    "../packages/core/src/services/llm"
+  );
 
   const queries = await generateSearchQueriesWithRetry(
     "Latest developments in web development frameworks and best practices",
@@ -45,7 +47,9 @@ async function testMockResearch() {
 
   // Test 2: Search Execution
   console.log("2. Testing Search Execution...");
-  const { searchMultipleQueries } = await import("../packages/core/src/services/brave-search");
+  const { searchMultipleQueries } = await import(
+    "../packages/core/src/services/brave-search"
+  );
 
   const searchResults = await searchMultipleQueries(
     queries.slice(0, 2).map((q) => q.query),
@@ -84,7 +88,9 @@ async function testMockResearch() {
 
   // Test 4: Relevancy Analysis
   console.log("4. Testing Relevancy Analysis...");
-  const { analyzeRelevancyWithRetry } = await import("../packages/core/src/services/llm");
+  const { analyzeRelevancyWithRetry } = await import(
+    "../packages/core/src/services/llm"
+  );
 
   const contentsToAnalyze = successfulExtractions.map((c) => ({
     url: c.url,
@@ -106,7 +112,9 @@ async function testMockResearch() {
   // Test 5: Report Compilation
   if (relevantResults.length > 0) {
     console.log("5. Testing Report Compilation...");
-    const { compileReportWithRetry } = await import("../packages/core/src/services/llm");
+    const { compileReportWithRetry } = await import(
+      "../packages/core/src/services/llm"
+    );
 
     const resultsForReport = relevantResults.map((r) => ({
       url: r.url,
@@ -116,11 +124,13 @@ async function testMockResearch() {
       keyPoints: r.keyPoints,
     }));
 
-    const report = await compileReportWithRetry(
-      resultsForReport,
-      "Web Development Research",
-      "Latest developments in web development frameworks and best practices"
-    );
+    const report = await compileReportWithRetry({
+      results: resultsForReport,
+      projectTitle: "Web Development Research",
+      projectDescription:
+        "Latest developments in web development frameworks and best practices",
+      frequency: "weekly",
+    });
 
     console.log(`   ✓ Report compiled successfully\n`);
     console.log(`\n${"=".repeat(60)}`);

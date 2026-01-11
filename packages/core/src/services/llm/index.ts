@@ -22,12 +22,37 @@ export {
   filterSearchResultsSafe,
 } from "./search-filtering";
 
-export { compileReport, compileReportWithRetry } from "./report-compilation";
+export {
+  compileReport,
+  compileReportWithRetry,
+  compileClusteredReport,
+  compileClusteredReportWithRetry,
+  generateReportSummary,
+  generateReportSummaryWithRetry,
+  type CompileReportOptions,
+  type CompileClusteredReportOptions,
+  type GenerateSummaryOptions,
+} from "./report-compilation";
+
+export {
+  clusterArticlesByTopic,
+  shouldCluster,
+  type ClusteringOptions,
+} from "./topic-clustering";
+
+export {
+  generateEmbeddings,
+  generateEmbedding,
+  cosineSimilarity,
+  calculateSimilarityMatrix,
+  findSimilarPairs,
+} from "./embeddings";
 
 export {
   QUERY_GENERATION_PROMPTS,
   RELEVANCY_ANALYSIS_PROMPTS,
   REPORT_COMPILATION_PROMPTS,
+  CLUSTERED_REPORT_COMPILATION_PROMPTS,
   renderPrompt,
   getPromptConfig,
   type PromptConfig,
@@ -40,4 +65,6 @@ export type {
   RelevancyResult,
   ResultForReport,
   CompiledReport,
+  TopicCluster,
+  ArticleSource,
 } from "./types";

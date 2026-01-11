@@ -40,6 +40,7 @@ Snippet: ${r.description}
   try {
     const response = await client.chat.completions.create({
       model: SEARCH_RESULT_FILTERING_PROMPTS.model,
+      temperature: SEARCH_RESULT_FILTERING_PROMPTS.temperature ?? 0.7,
       messages: [
         { role: "system", content: SEARCH_RESULT_FILTERING_PROMPTS.system },
         { role: "user", content: userPrompt },
@@ -77,11 +78,14 @@ export async function filterSearchResultsSafe(
   try {
     return await filterSearchResults(results, projectDescription);
   } catch (error) {
-    console.warn("Falling back to keeping all results due to filter error:", error);
-    return results.map(r => ({
+    console.warn(
+      "Falling back to keeping all results due to filter error:",
+      error
+    );
+    return results.map((r) => ({
       url: r.url,
       keep: true,
-      reasoning: "Fallback due to error"
+      reasoning: "Fallback due to error",
     }));
   }
 }

@@ -142,11 +142,12 @@ async function testReportCompilation() {
     "Latest developments in AI language models and their applications in software development";
 
   try {
-    const report = await compileReport(
+    const report = await compileReport({
       results,
       projectTitle,
-      projectDescription
-    );
+      projectDescription,
+      frequency: "weekly",
+    });
 
     console.log("✓ Report compiled successfully!\n");
     console.log(`Title: ${report.title}`);
