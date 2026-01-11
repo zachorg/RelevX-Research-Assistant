@@ -75,3 +75,56 @@ export function calculateDateRangeByPreference(
       return calculateDateRange(7, endDate);
   }
 }
+
+/**
+ * Format a date string to a human-readable format like "Jan 10th, 2026"
+ * Handles ISO date strings, timestamps, and date objects
+ * Returns empty string if date is invalid or missing
+ */
+export function formatReadableDate(
+  dateInput: string | Date | undefined | null
+): string {
+  if (!dateInput) {
+    return "";
+  }
+
+  try {
+    const date =
+      typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return "";
+    }
+
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+
+    const day = date.getDate();
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+
+    // Get ordinal suffix (1st, 2nd, 3rd, 4th, etc.)
+    const getOrdinalSuffix = (n: number): string => {
+      const s = ["th", "st", "nd", "rd"];
+      const v = n % 100;
+      return s[(v - 20) % 10] || s[v] || s[0];
+    };
+
+    return `${month} ${day}${getOrdinalSuffix(day)}, ${year}`;
+  } catch {
+    return "";
+  }
+}

@@ -11,6 +11,7 @@ import {
 } from "./prompts";
 import type { SearchParameters, Frequency } from "../../models/project";
 import type { ResultForReport, CompiledReport, TopicCluster } from "./types";
+import { formatReadableDate } from "../../utils/date-filters";
 
 /**
  * Options for report compilation
@@ -64,20 +65,21 @@ export async function compileReport(
   const sortedResults = [...results].sort((a, b) => b.score - a.score);
 
   const resultsFormatted = sortedResults
-    .map(
-      (r, idx) => `
+    .map((r, idx) => {
+      const publishedDate = formatReadableDate(r.publishedDate);
+      return `
 Result ${idx + 1}:
 URL: ${r.url}
 Title: ${r.title || "N/A"}
 Score: ${r.score}/100
-Published: ${r.publishedDate || "Unknown"}
+${publishedDate ? `Published: ${publishedDate}` : ""}
 Author: ${r.author || "Unknown"}
 Key Points: ${r.keyPoints.join("; ")}
 ${r.imageUrl ? `Image: ${r.imageUrl} (Alt: ${r.imageAlt || "N/A"})` : ""}
 Snippet:
 ${r.snippet}
----`
-    )
+---`;
+    })
     .join("\n");
 
   // Render user prompt with template variables
@@ -176,11 +178,12 @@ function formatCluster(cluster: TopicCluster, idx: number): string {
   const related = cluster.relatedArticles;
   const allArticles = [primary, ...related];
 
-  // Format sources list
+  // Format sources list with human-readable dates (omit date if not available)
   const sourcesFormatted = cluster.allSources
-    .map(
-      (s) => `  - ${s.name}: ${s.url} (${s.publishedDate || "Unknown date"})`
-    )
+    .map((s) => {
+      const date = formatReadableDate(s.publishedDate);
+      return `  - ${s.name}: ${s.url}${date ? ` (${date})` : ""}`;
+    })
     .join("\n");
 
   // Format all key points from cluster

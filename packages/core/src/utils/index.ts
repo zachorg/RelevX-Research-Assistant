@@ -15,6 +15,7 @@ export {
   calculateDateRange,
   calculateDateRangeByFrequency,
   calculateDateRangeByPreference,
+  formatReadableDate,
   type DateRange,
 } from "./date-filters";
 
