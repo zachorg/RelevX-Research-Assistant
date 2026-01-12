@@ -16,6 +16,21 @@ export interface DeliveryStats {
   iterationsRequired: number; // Number of retry iterations (1-3)
   urlsFetched: number; // Total URLs fetched
   urlsSuccessful: number; // URLs successfully scraped
+
+  // Performance metrics
+  researchDurationMs: number; // Total research execution time
+
+  // Token usage / cost estimates
+  estimatedTotalTokens: number; // Estimated total tokens used (input + output)
+  estimatedCostUsd: number; // Estimated API cost in USD
+
+  // Search context
+  freshnessUsed: string; // Final freshness value used (pd, pw, pm, py)
+  freshnessExpanded: boolean; // Whether search timeframe was expanded
+
+  // Provider info
+  llmProvider: string; // LLM provider used (e.g., "openai", "gemini")
+  llmModel: string; // Specific model used (e.g., "gpt-4o-mini")
 }
 
 /**

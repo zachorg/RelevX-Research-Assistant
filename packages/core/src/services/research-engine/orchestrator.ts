@@ -29,6 +29,12 @@ import type {
 } from "../../interfaces/search-provider";
 import { extractMultipleContents } from "../content-extractor";
 import { validateFrequency } from "../../utils/scheduling";
+import {
+  createTokenUsageTracker,
+  estimateTokens,
+  estimateCost,
+  type TokenUsage,
+} from "../../utils/token-estimation";
 import { getSearchHistory, updateSearchHistory } from "./search-history";
 import { saveSearchResults, saveDeliveryLog } from "./result-storage";
 import type { ResearchOptions, ResearchResult } from "./types";
@@ -146,6 +152,9 @@ export async function executeResearchForProject(
   const llmProvider = options?.llmProvider || defaults.llm;
   const searchProvider = options?.searchProvider || defaults.search;
 
+  // Initialize token usage tracker for cost estimation
+  const tokenUsage = createTokenUsageTracker();
+
   try {
     // 1. Load project
     const projectRef = db
@@ -259,6 +268,13 @@ export async function executeResearchForProject(
       allQueriesGenerated.push(...queries);
       console.log(`Generated ${queries.length} queries`);
 
+      // Track token usage for query generation
+      const queryGenInput = project.description + (additionalContext || "");
+      const queryGenOutput = JSON.stringify(generatedQueries);
+      tokenUsage.inputTokens += estimateTokens(queryGenInput) + 500; // +500 for system prompt
+      tokenUsage.outputTokens += estimateTokens(queryGenOutput);
+      tokenUsage.totalTokens = tokenUsage.inputTokens + tokenUsage.outputTokens;
+
       // 7.2 Execute searches with current freshness setting
       console.log("Executing searches...");
       const searchFilters: SearchFilters = {
@@ -364,6 +380,15 @@ export async function executeResearchForProject(
           console.log(
             `LLM filtered ${limitedResults.length} results down to ${resultsToFetch.length}`
           );
+
+          // Track token usage for search result filtering
+          const filterInput =
+            project.description + JSON.stringify(resultsForFilter);
+          const filterOutput = JSON.stringify(filtered);
+          tokenUsage.inputTokens += estimateTokens(filterInput) + 300; // +300 for system prompt
+          tokenUsage.outputTokens += estimateTokens(filterOutput);
+          tokenUsage.totalTokens =
+            tokenUsage.inputTokens + tokenUsage.outputTokens;
         } catch (err) {
           console.warn(
             "LLM filtering failed, proceeding with all results:",
@@ -463,6 +488,14 @@ export async function executeResearchForProject(
           batchSize: 10,
         }
       );
+
+      // Track token usage for relevancy analysis
+      const relevancyInput =
+        project.description + JSON.stringify(contentsToAnalyze);
+      const relevancyOutput = JSON.stringify(relevancyResults);
+      tokenUsage.inputTokens += estimateTokens(relevancyInput) + 800; // +800 for system prompt
+      tokenUsage.outputTokens += estimateTokens(relevancyOutput);
+      tokenUsage.totalTokens = tokenUsage.inputTokens + tokenUsage.outputTokens;
 
       // 7.6 Filter and create SearchResult objects
       const relevantResults = relevancyResults.filter((r) => r.isRelevant);
@@ -602,6 +635,13 @@ export async function executeResearchForProject(
         `Created ${clusters.length} topic clusters from ${resultsForReport.length} articles`
       );
 
+      // Track token usage for topic clustering (uses embeddings)
+      const clusterInput = JSON.stringify(resultsForReport);
+      tokenUsage.inputTokens += estimateTokens(clusterInput);
+      // Embeddings output is small (just vectors), so minimal output tokens
+      tokenUsage.outputTokens += 100;
+      tokenUsage.totalTokens = tokenUsage.inputTokens + tokenUsage.outputTokens;
+
       // 9.2 Compile report using clusters if we have any multi-article clusters
       const hasMultiArticleClusters = clusters.some(
         (c) => c.relatedArticles.length > 0
@@ -618,6 +658,13 @@ export async function executeResearchForProject(
           projectDescription: project.description,
           frequency: project.frequency,
         });
+
+        // Track token usage for clustered report compilation
+        const clusteredInput = project.description + JSON.stringify(clusters);
+        tokenUsage.inputTokens += estimateTokens(clusteredInput) + 1000; // +1000 for system prompt
+        tokenUsage.outputTokens += estimateTokens(compiledReport.markdown);
+        tokenUsage.totalTokens =
+          tokenUsage.inputTokens + tokenUsage.outputTokens;
       } else {
         // No clustering needed, use standard compilation
         console.log("No multi-article clusters, using standard compilation...");
@@ -631,6 +678,14 @@ export async function executeResearchForProject(
             frequency: project.frequency,
           }
         );
+
+        // Track token usage for standard report compilation
+        const reportInput =
+          project.description + JSON.stringify(resultsForReport);
+        tokenUsage.inputTokens += estimateTokens(reportInput) + 1000; // +1000 for system prompt
+        tokenUsage.outputTokens += estimateTokens(compiledReport.markdown);
+        tokenUsage.totalTokens =
+          tokenUsage.inputTokens + tokenUsage.outputTokens;
       }
 
       // 9.3 Generate executive summary from the compiled report
@@ -640,6 +695,13 @@ export async function executeResearchForProject(
         projectTitle: project.title,
         projectDescription: project.description,
       });
+
+      // Track token usage for executive summary
+      const summaryInput =
+        compiledReport.markdown + project.title + project.description;
+      tokenUsage.inputTokens += estimateTokens(summaryInput) + 400; // +400 for system prompt
+      tokenUsage.outputTokens += estimateTokens(executiveSummary || "");
+      tokenUsage.totalTokens = tokenUsage.inputTokens + tokenUsage.outputTokens;
 
       report = {
         markdown: compiledReport.markdown,
@@ -665,6 +727,7 @@ export async function executeResearchForProject(
     let deliveryLogId: string | undefined;
     if (report && sortedResults.length > 0) {
       console.log("Saving delivery log...");
+      const completedAtForStats = Date.now();
       const stats: DeliveryStats = {
         totalResults: allRelevantResults.length,
         includedResults: sortedResults.length,
@@ -673,6 +736,21 @@ export async function executeResearchForProject(
         iterationsRequired: iteration,
         urlsFetched: totalUrlsFetched,
         urlsSuccessful: totalUrlsSuccessful,
+
+        // Performance metrics
+        researchDurationMs: completedAtForStats - startedAt,
+
+        // Token usage / cost estimates
+        estimatedTotalTokens: tokenUsage.totalTokens,
+        estimatedCostUsd: estimateCost(tokenUsage, llmProvider.getModel()),
+
+        // Search context
+        freshnessUsed: currentFreshness,
+        freshnessExpanded: freshnessExpanded,
+
+        // Provider info
+        llmProvider: llmProvider.getName(),
+        llmModel: llmProvider.getModel(),
       };
 
       deliveryLogId = await saveDeliveryLog(

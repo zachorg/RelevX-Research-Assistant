@@ -108,6 +108,16 @@ export interface TopicCluster {
  */
 export interface LLMProvider {
   /**
+   * Get the provider name (e.g., "openai", "gemini")
+   */
+  getName(): string;
+
+  /**
+   * Get the model name being used (e.g., "gpt-4o-mini", "gemini-1.5-flash-8b")
+   */
+  getModel(): string;
+
+  /**
    * Generate search queries from project description
    */
   generateSearchQueries(

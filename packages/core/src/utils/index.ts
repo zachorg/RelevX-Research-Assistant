@@ -21,3 +21,14 @@ export {
 
 // Deduplication utilities
 export { normalizeUrl } from "./deduplication";
+
+// Token estimation utilities
+export {
+  estimateTokens,
+  estimateCost,
+  formatCost,
+  createTokenUsageTracker,
+  addTokenUsage,
+  MODEL_PRICING,
+  type TokenUsage,
+} from "./token-estimation";

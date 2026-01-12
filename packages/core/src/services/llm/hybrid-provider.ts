@@ -29,6 +29,20 @@ export class HybridProvider implements LLMProvider {
     this.reportProvider = config.reportProvider;
   }
 
+  /**
+   * Get the provider name (reports the primary/report provider)
+   */
+  getName(): string {
+    return `hybrid(${this.reportProvider.getName()})`;
+  }
+
+  /**
+   * Get the model name (reports the primary/report provider model)
+   */
+  getModel(): string {
+    return this.reportProvider.getModel();
+  }
+
   async generateSearchQueries(
     description: string,
     additionalContext?: string,
@@ -56,7 +70,10 @@ export class HybridProvider implements LLMProvider {
   async compileReport(
     description: string,
     results: ResultForReport[],
-    options?: { tone?: "professional" | "casual" | "technical"; maxLength?: number }
+    options?: {
+      tone?: "professional" | "casual" | "technical";
+      maxLength?: number;
+    }
   ): Promise<CompiledReport> {
     return this.reportProvider.compileReport(description, results, options);
   }

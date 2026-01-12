@@ -45,6 +45,20 @@ export class GeminiProvider implements LLMProvider {
   }
 
   /**
+   * Get the provider name
+   */
+  getName(): string {
+    return "gemini";
+  }
+
+  /**
+   * Get the model name being used
+   */
+  getModel(): string {
+    return this.modelName;
+  }
+
+  /**
    * Generate search queries
    */
   async generateSearchQueries(

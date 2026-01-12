@@ -34,12 +34,27 @@ import { initializeOpenAI as initOpenAI, getClient } from "./client";
  */
 export class OpenAIProvider implements LLMProvider {
   private initialized: boolean = false;
+  private readonly modelName: string = "gpt-4o-mini";
 
   constructor(apiKey?: string) {
     if (apiKey) {
       initOpenAI(apiKey);
       this.initialized = true;
     }
+  }
+
+  /**
+   * Get the provider name
+   */
+  getName(): string {
+    return "openai";
+  }
+
+  /**
+   * Get the model name being used
+   */
+  getModel(): string {
+    return this.modelName;
   }
 
   /**
