@@ -6,6 +6,7 @@ import {
   UserAnalyticsDocument,
   kAnalyticsCollectionTopDown,
   kAnalyticsDailyDateKey,
+  kAnalyticsMonthlyDateKey,
   kAnalyticsUserCollection,
 } from "core";
 
@@ -19,8 +20,9 @@ async function update_topdown_analytics_completed_research(
     throw new Error("Firebase firestore not initialized");
   }
 
-  const dateKey = kAnalyticsDailyDateKey(new Date()); // YYYY-MM format
-  const usageRef = db.doc(kAnalyticsCollectionTopDown(dateKey));
+  const monthKey = kAnalyticsMonthlyDateKey(new Date()); // YYYY-MM format
+  const dailyKey = kAnalyticsDailyDateKey(new Date()); // YYYY-MM-DD format
+  const usageRef = db.doc(kAnalyticsCollectionTopDown(monthKey));
 
   await db.runTransaction(async (transaction) => {
     const usageDoc = await transaction.get(usageRef);
@@ -35,12 +37,22 @@ async function update_topdown_analytics_completed_research(
 
     const key = "num_completed_monthly_research";
     const num_completed_monthly_research = data[key];
+
+    const keyDaily = "num_completed_daily_research";
+    const num_completed_daily_research: Record<string, number> =
+      data[keyDaily] || {};
+
     transaction.set(
       usageRef,
       {
         ...data,
         [key]: num_completed_monthly_research + numResearch,
-      },
+        [keyDaily]: {
+          ...num_completed_daily_research,
+          [dailyKey]:
+            (num_completed_daily_research[dailyKey] || 0) + numResearch,
+        },
+      } as TopDownAnalyticsDocument,
       { merge: true }
     );
   });
@@ -51,7 +63,7 @@ export async function check_and_increment_research_usage(
   db: Firestore,
   userId: string,
   plan: Plan,
-  projectId: string
+  projectTitle: string
 ): Promise<any> {
   if (!db) {
     throw new Error("Firebase firestore not initialized");
@@ -64,41 +76,35 @@ export async function check_and_increment_research_usage(
     const usageDoc = await transaction.get(usageRef);
 
     let data: UserAnalyticsDocument = {
-      num_completed_daily_research_projects: {},
+      num_completed_daily_research_projects: [],
       num_completed_research: 0,
     };
     if (usageDoc.exists) {
       data = usageDoc.data() as UserAnalyticsDocument;
     }
 
-    const key = "num_completed_research";
-    const completed_requests = data[key];
+    const completed_daily_projects: string[] =
+      data.num_completed_daily_research_projects || [];
 
-    const key_daily = "num_completed_daily_research_projects";
-    const completed_daily_projects: Array<string> = data[key_daily];
-
-    const currentCount = completed_daily_projects?.length || 0;
+    const currentCount = completed_daily_projects.length;
 
     // assume always one project update
     if (
       currentCount + 1 > plan.settingsMaxDailyRuns ||
-      completed_daily_projects?.includes(projectId)
+      completed_daily_projects.find((id) => id === projectTitle) !== undefined
     ) {
-      return false;
+      return null;
     }
 
     const value = await onRun();
     if (value) {
-      completed_daily_projects.push(projectId);
+      completed_daily_projects.push(projectTitle);
       transaction.set(
         usageRef,
         {
           ...data,
-          [key]: completed_requests + 1,
-          [key_daily]: {
-            ...completed_daily_projects,
-          },
-        } as AnalyticsDocument,
+          num_completed_daily_research_projects: completed_daily_projects,
+        } as UserAnalyticsDocument,
         { merge: true }
       );
 

@@ -8,7 +8,7 @@ import type {
   RelevxDeliveryLog,
   DeliveryLog,
   ProjectDeliveryLogResponse,
-  AnalyticsDocument,
+  UserAnalyticsDocument,
 } from "core";
 import { Frequency, getUserAnalytics } from "core";
 import { set, isAfter, add } from "date-fns";
@@ -618,13 +618,14 @@ const routes: FastifyPluginAsync = async (app) => {
 
             // Validate that the new schedule allows the user to stay within their plan's limits
             if (plan && validateActiveProjects(plan, projects)) {
-              const userAnalytics: AnalyticsDocument | null =
+              const userAnalytics: UserAnalyticsDocument =
                 await getUserAnalytics(db, userId);
 
-              const forceNextRun =
-                userAnalytics?.num_completed_daily_research_projects.find(
-                  (item) => item === title
-                );
+              const dailyResearchProjects: string[] =
+                userAnalytics.num_completed_daily_research_projects;
+              const forceNextRun = dailyResearchProjects.find(
+                (item) => item === title
+              );
 
               // Calculate the next run time based on the new schedule
               const newRunAt = calculateNewRunAt(
@@ -748,6 +749,7 @@ const routes: FastifyPluginAsync = async (app) => {
             .send({ error: { message: "Project not found" } });
 
         let nStatus: string = projectToToggle.status;
+        const updates: any = {};
         let cStatus: string = nStatus;
         if (nStatus === status)
           return rep.status(400).send({
@@ -792,6 +794,23 @@ const routes: FastifyPluginAsync = async (app) => {
               errorMessage =
                 "User has reached the maximum number of daily runs. Please subscribe to a higher plan, if available.";
             } else {
+              // calculate next run time if plan limit are already met
+              const analytics: UserAnalyticsDocument = await getUserAnalytics(
+                db,
+                userId
+              );
+              console.log("analytics", analytics);
+              const dailyResearch =
+                analytics.num_completed_daily_research_projects;
+              console.log("dailyResearch", dailyResearch);
+              updates.nextRunAt = calculateNewRunAt(
+                projectToToggle.frequency,
+                projectToToggle.deliveryTime,
+                projectToToggle.timezone,
+                projectToToggle.dayOfWeek,
+                projectToToggle.dayOfMonth,
+                dailyResearch.length + 1 > plan.settingsMaxDailyRuns
+              );
               nStatus = status;
             }
           } else {
@@ -817,6 +836,7 @@ const routes: FastifyPluginAsync = async (app) => {
             .then((querySnapshot) => {
               querySnapshot.forEach((doc) => {
                 doc.ref.update({
+                  ...updates,
                   status: nStatus,
                   updatedAt: new Date().toISOString(),
                 });
