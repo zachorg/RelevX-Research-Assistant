@@ -1,17 +1,12 @@
 /**
  * OpenAI Embeddings for semantic similarity
  *
- * Uses text-embedding-3-small for efficient, low-cost embeddings
+ * Uses embeddings model configured in research-config.yaml
  * to detect semantically similar articles.
  */
 
 import { getClient } from "./client";
-
-/**
- * Embedding model configuration
- */
-const EMBEDDING_MODEL = "text-embedding-3-small";
-const EMBEDDING_DIMENSIONS = 1536; // Default for text-embedding-3-small
+import { getEmbeddingsConfig } from "../research-engine/config";
 
 /**
  * Generate embeddings for a list of texts
@@ -25,9 +20,11 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   const client = getClient();
 
   try {
+    const embeddingsConfig = getEmbeddingsConfig();
     const response = await client.embeddings.create({
-      model: EMBEDDING_MODEL,
+      model: embeddingsConfig.model,
       input: texts,
+      dimensions: embeddingsConfig.dimensions,
     });
 
     // Sort by index to ensure correct order

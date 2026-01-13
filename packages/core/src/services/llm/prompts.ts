@@ -5,7 +5,16 @@
  * Prompts use template placeholders that are filled at runtime.
  *
  * Template syntax: {{placeholder}} - will be replaced with actual values
+ *
+ * Model and temperature settings are loaded from research-config.yaml
+ * and can be overridden at runtime via ResearchOptions.
  */
+
+import {
+  getModelConfig,
+  type ModelConfig,
+  type LLMConfig,
+} from "../research-engine/config";
 
 export interface PromptConfig {
   system: string;
@@ -16,13 +25,36 @@ export interface PromptConfig {
 }
 
 /**
- * Prompt templates for query generation
+ * Model step types that can be configured
  */
-export const QUERY_GENERATION_PROMPTS: PromptConfig = {
-  model: "gpt-4o-mini",
-  responseFormat: "json_object",
-  temperature: 0.8, // Higher for creative, diverse query generation
-  system: `You are a search query optimization expert. Your task is to generate diverse, effective search queries that will find relevant content on the web.
+type ModelStep = keyof LLMConfig["models"];
+
+/**
+ * Get prompt config with model settings from research config
+ */
+function createPromptConfig(
+  step: ModelStep,
+  system: string,
+  user: string
+): PromptConfig {
+  const modelConfig = getModelConfig(step);
+  return {
+    system,
+    user,
+    model: modelConfig.model,
+    temperature: modelConfig.temperature,
+    responseFormat: modelConfig.responseFormat,
+  };
+}
+
+/**
+ * Prompt templates for query generation
+ * Model and temperature loaded from research-config.yaml
+ */
+export function getQueryGenerationPrompts(): PromptConfig {
+  return createPromptConfig(
+    "queryGeneration",
+    `You are a search query optimization expert. Your task is to generate diverse, effective search queries that will find relevant content on the web.
 
 Generate 5 search queries using different strategies:
 1. BROAD queries - general terms that cast a wide net
@@ -32,7 +64,7 @@ Generate 5 search queries using different strategies:
 
 Each query should be distinct and approach the topic from different angles.
 Queries should be concise (3-8 words typically) and use natural search language.`,
-  user: `Project Description:
+    `Project Description:
 {{description}}
 
 {{additionalContext}}{{queryPerformanceContext}}{{iterationGuidance}}
@@ -46,17 +78,22 @@ Generate 5 diverse search queries. Return ONLY a JSON object with this structure
       "reasoning": "brief explanation of strategy"
     }
   ]
-}`,
-};
+}`
+  );
+}
+
+// Legacy export for backward compatibility
+export const QUERY_GENERATION_PROMPTS: PromptConfig =
+  getQueryGenerationPrompts();
 
 /**
  * Prompt templates for search result filtering
+ * Model and temperature loaded from research-config.yaml
  */
-export const SEARCH_RESULT_FILTERING_PROMPTS: PromptConfig = {
-  model: "gpt-4o-mini",
-  responseFormat: "json_object",
-  temperature: 0.2, // Low for consistent binary decisions
-  system: `You are a strict research curator. Your task is to filter search results based on their title and snippet to decide if they are worth reading.
+export function getSearchResultFilteringPrompts(): PromptConfig {
+  return createPromptConfig(
+    "searchFiltering",
+    `You are a strict research curator. Your task is to filter search results based on their title and snippet to decide if they are worth reading.
 
 Criteria for keeping:
 1. Directly relevant to the user's project.
@@ -64,7 +101,7 @@ Criteria for keeping:
 3. Not a duplicate or low-quality SEO spam site.
 
 Be strict. We only want to fetch the most promising content.`,
-  user: `Project Description:
+    `Project Description:
 {{description}}
 
 Search Results to Filter:
@@ -79,17 +116,22 @@ Evaluate each result and return ONLY a JSON object with this structure:
       "reasoning": "brief reason"
     }
   ]
-}`,
-};
+}`
+  );
+}
+
+// Legacy export for backward compatibility
+export const SEARCH_RESULT_FILTERING_PROMPTS: PromptConfig =
+  getSearchResultFilteringPrompts();
 
 /**
  * Prompt templates for relevancy analysis
+ * Model and temperature loaded from research-config.yaml
  */
-export const RELEVANCY_ANALYSIS_PROMPTS: PromptConfig = {
-  model: "gpt-4o-mini",
-  responseFormat: "json_object",
-  temperature: 0.3, // Low for consistent scoring
-  system: `You are a content relevancy analyst. Your task is to analyze web content and determine how relevant it is to a user's research project.
+export function getRelevancyAnalysisPrompts(): PromptConfig {
+  return createPromptConfig(
+    "relevancyAnalysis",
+    `You are a content relevancy analyst. Your task is to analyze web content and determine how relevant it is to a user's research project.
 
 For each piece of content, provide:
 1. A relevancy score (0-100) where:
@@ -102,7 +144,7 @@ For each piece of content, provide:
 2. Clear reasoning explaining the score
 3. Key relevant points found in the content
 4. Whether it meets the minimum threshold for inclusion`,
-  user: `Project Description:
+    `Project Description:
 {{projectDescription}}
 
 {{requirements}}
@@ -122,17 +164,22 @@ Analyze each piece of content and return ONLY a JSON object with this structure:
       "isRelevant": true or false (based on threshold)
     }
   ]
-}`,
-};
+}`
+  );
+}
+
+// Legacy export for backward compatibility
+export const RELEVANCY_ANALYSIS_PROMPTS: PromptConfig =
+  getRelevancyAnalysisPrompts();
 
 /**
  * Prompt templates for report compilation
+ * Model and temperature loaded from research-config.yaml
  */
-export const REPORT_COMPILATION_PROMPTS: PromptConfig = {
-  model: "gpt-4o-mini",
-  responseFormat: "json_object",
-  temperature: 0.3, // Low for factual, consistent output
-  system: `You are a research assistant delivering factual, data-rich reports in a vertical newsletter format.
+export function getReportCompilationPrompts(): PromptConfig {
+  return createPromptConfig(
+    "reportCompilation",
+    `You are a research assistant delivering factual, data-rich reports in a vertical newsletter format.
 
 **Report Structure:**
 Present each news item in a vertical reading flow:
@@ -171,7 +218,7 @@ Choose the best format for each item's details based on the content:
 - Links on titles
 
 **Tone:** Direct, factual, scannable.`,
-  user: `Project: {{projectTitle}}
+    `Project: {{projectTitle}}
 Description: {{projectDescription}}
 Report Frequency: {{frequency}}
 Report Date: {{reportDate}}
@@ -210,18 +257,23 @@ Return ONLY a JSON object:
   "markdown": "the full markdown report in vertical newsletter format",
   "title": "Descriptive title",
   "summary": "2-3 factual sentences with key takeaways"
-}`,
-};
+}`
+  );
+}
+
+// Legacy export for backward compatibility
+export const REPORT_COMPILATION_PROMPTS: PromptConfig =
+  getReportCompilationPrompts();
 
 /**
  * Prompt templates for clustered report compilation
  * Used when articles have been grouped by semantic similarity
+ * Model and temperature loaded from research-config.yaml
  */
-export const CLUSTERED_REPORT_COMPILATION_PROMPTS: PromptConfig = {
-  model: "gpt-4o-mini",
-  responseFormat: "json_object",
-  temperature: 0.3,
-  system: `You are a research assistant delivering factual, data-rich reports in a vertical newsletter format.
+export function getClusteredReportCompilationPrompts(): PromptConfig {
+  return createPromptConfig(
+    "clusteredReportCompilation",
+    `You are a research assistant delivering factual, data-rich reports in a vertical newsletter format.
 
 **IMPORTANT: You are receiving TOPIC CLUSTERS - groups of articles covering the same story/event from different sources.**
 
@@ -264,7 +316,7 @@ Choose the best format based on the combined content:
 - Put links on titles
 
 **Tone:** Direct, factual, scannable.`,
-  user: `Project: {{projectTitle}}
+    `Project: {{projectTitle}}
 Description: {{projectDescription}}
 Report Frequency: {{frequency}}
 Report Date: {{reportDate}}
@@ -303,18 +355,23 @@ Return ONLY a JSON object:
   "markdown": "the full markdown report in vertical newsletter format",
   "title": "Descriptive title",
   "summary": "2-3 factual sentences with key takeaways"
-}`,
-};
+}`
+  );
+}
+
+// Legacy export for backward compatibility
+export const CLUSTERED_REPORT_COMPILATION_PROMPTS: PromptConfig =
+  getClusteredReportCompilationPrompts();
 
 /**
  * Prompt for generating executive summary from completed report
  * Called as a separate step after report compilation
+ * Model and temperature loaded from research-config.yaml
  */
-export const REPORT_SUMMARY_PROMPTS: PromptConfig = {
-  model: "gpt-4o-mini",
-  responseFormat: "json_object",
-  temperature: 0.2, // Low for consistent, factual output
-  system: `You are an expert at writing concise executive summaries. Given a research report, extract the 2-3 most important findings and write a brief, fact-dense summary.
+export function getReportSummaryPrompts(): PromptConfig {
+  return createPromptConfig(
+    "reportSummary",
+    `You are an expert at writing concise executive summaries. Given a research report, extract the 2-3 most important findings and write a brief, fact-dense summary.
 
 **Guidelines:**
 - Focus on the most significant or impactful news items
@@ -323,7 +380,7 @@ export const REPORT_SUMMARY_PROMPTS: PromptConfig = {
 - Write in complete sentences
 - Do NOT start with "This report covers..." or similar meta-statements
 - Jump straight into the key findings`,
-  user: `Write a 2-3 sentence executive summary for this research report:
+    `Write a 2-3 sentence executive summary for this research report:
 
 Project: {{projectTitle}}
 Description: {{projectDescription}}
@@ -334,8 +391,12 @@ Report Content:
 Return ONLY a JSON object:
 {
   "summary": "2-3 factual sentences highlighting the most important findings"
-}`,
-};
+}`
+  );
+}
+
+// Legacy export for backward compatibility
+export const REPORT_SUMMARY_PROMPTS: PromptConfig = getReportSummaryPrompts();
 
 /**
  * Helper function to replace template placeholders
@@ -354,24 +415,53 @@ export function renderPrompt(
 
 /**
  * Get prompt configuration by type
+ * Now returns fresh config each time to reflect any config changes
  */
 export type PromptType =
   | "query-generation"
   | "search-result-filtering"
   | "relevancy-analysis"
-  | "report-compilation";
+  | "report-compilation"
+  | "clustered-report-compilation"
+  | "report-summary";
 
 export function getPromptConfig(type: PromptType): PromptConfig {
   switch (type) {
     case "query-generation":
-      return QUERY_GENERATION_PROMPTS;
+      return getQueryGenerationPrompts();
     case "relevancy-analysis":
-      return RELEVANCY_ANALYSIS_PROMPTS;
+      return getRelevancyAnalysisPrompts();
     case "search-result-filtering":
-      return SEARCH_RESULT_FILTERING_PROMPTS;
+      return getSearchResultFilteringPrompts();
     case "report-compilation":
-      return REPORT_COMPILATION_PROMPTS;
+      return getReportCompilationPrompts();
+    case "clustered-report-compilation":
+      return getClusteredReportCompilationPrompts();
+    case "report-summary":
+      return getReportSummaryPrompts();
     default:
       throw new Error(`Unknown prompt type: ${type}`);
   }
+}
+
+/**
+ * Get prompt configuration with custom model overrides
+ * Useful for per-request customization
+ */
+export function getPromptConfigWithOverrides(
+  type: PromptType,
+  overrides?: Partial<ModelConfig>
+): PromptConfig {
+  const baseConfig = getPromptConfig(type);
+
+  if (!overrides) {
+    return baseConfig;
+  }
+
+  return {
+    ...baseConfig,
+    model: overrides.model ?? baseConfig.model,
+    temperature: overrides.temperature ?? baseConfig.temperature,
+    responseFormat: overrides.responseFormat ?? baseConfig.responseFormat,
+  };
 }
