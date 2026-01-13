@@ -28,7 +28,6 @@ export interface ResearchOptions {
   minResults?: number; // Min results to find (default: from project.settings)
   maxResults?: number; // Max results to include (default: from project.settings)
   relevancyThreshold?: number; // Min score (default: from project.settings)
-  concurrentExtractions?: number; // Parallel extractions (default: from config)
   ignoreFrequencyCheck?: boolean; // Skip frequency validation (default: false)
 
   // === Provider Injection ===
@@ -55,11 +54,7 @@ export interface ResearchOptions {
   reportMaxLength?: number; // Max report length (default: from config)
   includeExecutiveSummary?: boolean; // Include summary (default: from config)
 
-  // === Extraction Settings ===
-  extractionTimeoutMs?: number; // Request timeout (default: from config)
-  extractionConcurrency?: number; // Parallel extractions (default: from config)
-
-  // === Rate Limiting ===
+  // === Rate Limiting (advisory) ===
   apiDelayMs?: number; // Delay between API calls (default: from config)
   maxConcurrentLlmRequests?: number; // Max concurrent LLM requests (default: from config)
 

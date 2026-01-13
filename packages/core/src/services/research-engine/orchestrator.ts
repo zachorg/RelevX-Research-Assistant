@@ -42,12 +42,10 @@ import { getSearchHistory, updateSearchHistory } from "./search-history";
 import { saveSearchResults, saveDeliveryLog } from "./result-storage";
 import type { ResearchOptions, ResearchResult } from "./types";
 import {
-  getConfig,
   getResearchConfig,
   getSearchConfig,
   getClusteringConfig,
   getReportConfig,
-  type ResearchConfig,
 } from "./config";
 
 // Default providers (can be overridden via options)
@@ -158,7 +156,6 @@ export async function executeResearchForProject(
   const startedAt = Date.now();
 
   // Load configuration (from file or defaults)
-  const config = getConfig();
   const researchConfig = getResearchConfig();
   const searchConfig = getSearchConfig();
   const clusteringConfig = getClusteringConfig();
@@ -226,8 +223,6 @@ export async function executeResearchForProject(
       options?.relevancyThreshold ??
       project.settings.relevancyThreshold ??
       researchConfig.defaultRelevancyThreshold;
-    const concurrentExtractions =
-      options?.concurrentExtractions ?? researchConfig.concurrentExtractions;
 
     // 4. Load search history
     const history = await getSearchHistory(userId, projectId);
@@ -438,12 +433,10 @@ export async function executeResearchForProject(
         }
       }
 
-      // 7.4 Extract content
+      // 7.4 Extract content (uses extraction.concurrency from config)
       console.log(`Extracting content from ${resultsToFetch.length} URLs...`);
       const extractedContents = await extractMultipleContents(
-        resultsToFetch.map((r) => r.url),
-        undefined,
-        concurrentExtractions // From config or options
+        resultsToFetch.map((r) => r.url)
       );
 
       totalUrlsFetched += extractedContents.length;

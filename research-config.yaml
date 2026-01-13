@@ -111,9 +111,6 @@ research:
   defaultMinResults: 5
   defaultMaxResults: 15
 
-  # Concurrent content extractions during research
-  concurrentExtractions: 5
-
   # LLM batch processing
   relevancyBatchSize: 10
 

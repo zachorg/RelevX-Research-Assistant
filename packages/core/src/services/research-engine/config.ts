@@ -73,7 +73,6 @@ export interface ResearchPipelineConfig {
   defaultRelevancyThreshold: number;
   defaultMinResults: number;
   defaultMaxResults: number;
-  concurrentExtractions: number;
   relevancyBatchSize: number;
 }
 
@@ -185,7 +184,6 @@ export const DEFAULT_CONFIG: ResearchConfig = {
     defaultRelevancyThreshold: 60,
     defaultMinResults: 5,
     defaultMaxResults: 15,
-    concurrentExtractions: 5,
     relevancyBatchSize: 10,
   },
   clustering: {

@@ -480,10 +480,9 @@ export async function extractContentWithRetry(
  */
 export async function extractMultipleContents(
   urls: string[],
-  options?: ExtractionOptions,
-  concurrency?: number
+  options?: ExtractionOptions
 ): Promise<ExtractedContent[]> {
-  const concurrencyLimit = concurrency ?? getExtractionConfig().concurrency;
+  const concurrencyLimit = getExtractionConfig().concurrency;
 
   const results: ExtractedContent[] = [];
   const queue = [...urls];
