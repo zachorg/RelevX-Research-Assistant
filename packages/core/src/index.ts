@@ -196,3 +196,8 @@ export {
   kAnalyticsDailyDateKey,
   kAnalyticsMonthlyDateKey,
 } from "./utils/analytics";
+
+export type {
+  ImproveProjectDescriptionRequest,
+  ImproveProjectDescriptionResponse,
+} from "./models/ai";

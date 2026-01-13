@@ -87,3 +87,8 @@ export {
   validateFrequency,
   isProjectDue,
 } from "./utils/scheduling";
+
+export type {
+  ImproveProjectDescriptionRequest,
+  ImproveProjectDescriptionResponse,
+} from "./models/ai";

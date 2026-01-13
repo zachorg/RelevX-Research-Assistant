@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import type { ProjectInfo, Frequency } from "core";
+import type { ProjectInfo, Frequency, ImproveProjectDescriptionRequest, ImproveProjectDescriptionResponse } from "core";
 import {
   Dialog,
   DialogContent,
@@ -18,8 +18,15 @@ import { Select } from "@/components/ui/select";
 import { TimePicker } from "@/components/ui/time-picker";
 import { DayOfWeekPicker } from "@/components/ui/day-of-week-picker";
 import { DayOfMonthPicker } from "@/components/ui/day-of-month-picker";
-import { Settings, Calendar, ChevronDown } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Settings, Calendar, ChevronDown, Sparkles, Loader2 } from "lucide-react";
 import { useProjects } from "@/hooks/use-projects";
+import { relevx_api } from "@/lib/client";
 
 interface EditProjectSettingsDialogProps {
   project: ProjectInfo;
@@ -52,6 +59,7 @@ export function EditProjectSettingsDialog({
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
 
   // Helper function to convert array to comma-separated string
   const arrayToString = (arr: string[] | undefined): string => {
@@ -65,6 +73,29 @@ export function EditProjectSettingsDialog({
       .split(/[,\n]/)
       .map((item) => item.trim())
       .filter((item) => item.length > 0);
+  };
+
+  const handleEnhanceDescription = async () => {
+    if (!description.trim() || isEnhancing) return;
+
+    setIsEnhancing(true);
+    try {
+      const request: ImproveProjectDescriptionRequest = {
+        description: description.trim() || "research project",
+      };
+      const response = await relevx_api.post<ImproveProjectDescriptionResponse>(
+        "/api/v1/ai/improve-project-description",
+        request as any
+      );
+      if (response.description) {
+        setDescription(response.description);
+      }
+    } catch (err) {
+      console.error("Failed to enhance description:", err);
+      setError("Failed to enhance description. Please try again.");
+    } finally {
+      setIsEnhancing(false);
+    }
   };
 
   // Reset form when project changes or dialog opens
@@ -224,9 +255,34 @@ export function EditProjectSettingsDialog({
 
             {/* Description */}
             <div className="space-y-2">
-              <Label htmlFor="edit-description">
-                What to Research <span className="text-destructive">*</span>
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="edit-description">
+                  What to Research <span className="text-destructive">*</span>
+                </Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={handleEnhanceDescription}
+                        disabled={isUpdating || isEnhancing}
+                      >
+                        {isEnhancing ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Enhance with AI</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <Textarea
                 id="edit-description"
                 placeholder="e.g., Latest developments in AI and machine learning, focusing on practical applications and breakthrough research"
