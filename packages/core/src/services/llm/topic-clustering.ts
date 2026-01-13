@@ -3,16 +3,20 @@
  *
  * Groups semantically similar articles into clusters so the report
  * can consolidate coverage of the same story from multiple sources.
+ *
+ * Configuration is loaded from research-config.yaml
  */
 
 import { generateEmbeddings, cosineSimilarity } from "./embeddings";
 import type { ResultForReport, TopicCluster, ArticleSource } from "./types";
+import { getClusteringConfig } from "../research-engine/config";
 
 /**
- * Default similarity threshold for clustering
- * 0.85 = articles must be ~85% semantically similar to be grouped
+ * Get default similarity threshold from config
  */
-const DEFAULT_SIMILARITY_THRESHOLD = 0.85;
+function getDefaultSimilarityThreshold(): number {
+  return getClusteringConfig().similarityThreshold;
+}
 
 /**
  * Options for topic clustering
@@ -150,7 +154,7 @@ export async function clusterArticlesByTopic(
   options?: ClusteringOptions
 ): Promise<TopicCluster[]> {
   const threshold =
-    options?.similarityThreshold ?? DEFAULT_SIMILARITY_THRESHOLD;
+    options?.similarityThreshold ?? getDefaultSimilarityThreshold();
 
   if (articles.length === 0) {
     return [];
@@ -275,8 +279,9 @@ export async function clusterArticlesByTopic(
  */
 export async function shouldCluster(
   articles: ResultForReport[],
-  threshold: number = DEFAULT_SIMILARITY_THRESHOLD
+  threshold?: number
 ): Promise<boolean> {
+  const effectiveThreshold = threshold ?? getDefaultSimilarityThreshold();
   if (articles.length < 2) {
     return false;
   }
@@ -287,7 +292,9 @@ export async function shouldCluster(
 
   for (let i = 0; i < embeddings.length; i++) {
     for (let j = i + 1; j < embeddings.length; j++) {
-      if (cosineSimilarity(embeddings[i], embeddings[j]) >= threshold) {
+      if (
+        cosineSimilarity(embeddings[i], embeddings[j]) >= effectiveThreshold
+      ) {
         return true;
       }
     }

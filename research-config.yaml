@@ -1,0 +1,156 @@
+# Research Engine Configuration
+# ==============================
+# This file controls all configurable aspects of the research pipeline.
+# Settings here are used as defaults and can be overridden via ResearchOptions.
+
+# =============================================================================
+# LLM Provider Settings
+# =============================================================================
+llm:
+  # Default provider: "openai" | "gemini"
+  provider: "openai"
+
+  # Model configurations for each step of the research pipeline
+  models:
+    # Query generation - creates search queries from project description
+    queryGeneration:
+      model: "gpt-4o-mini"
+      temperature: 0.8 # Higher for creative, diverse query generation
+      responseFormat: "json_object"
+
+    # Search result filtering - filters results before fetching content
+    searchFiltering:
+      model: "gpt-4o-mini"
+      temperature: 0.2 # Low for consistent binary decisions
+      responseFormat: "json_object"
+
+    # Relevancy analysis - scores content relevance to project
+    relevancyAnalysis:
+      model: "gpt-4o-mini"
+      temperature: 0.3 # Low for consistent scoring
+      responseFormat: "json_object"
+
+    # Report compilation - generates the final research report
+    reportCompilation:
+      model: "gpt-4o-mini"
+      temperature: 0.3 # Low for factual, consistent output
+      responseFormat: "json_object"
+
+    # Clustered report compilation - for multi-source topic reports
+    clusteredReportCompilation:
+      model: "gpt-4o-mini"
+      temperature: 0.3
+      responseFormat: "json_object"
+
+    # Report summary - generates executive summary
+    reportSummary:
+      model: "gpt-4o-mini"
+      temperature: 0.2 # Low for consistent, factual output
+      responseFormat: "json_object"
+
+  # Embeddings configuration (for semantic similarity/clustering)
+  embeddings:
+    model: "text-embedding-3-small"
+    dimensions: 1536
+
+# =============================================================================
+# Search Settings
+# =============================================================================
+search:
+  # Default search provider: "brave" | "google" | "bing"
+  provider: "brave"
+
+  # Number of search queries to generate per iteration
+  queriesPerIteration: 5
+
+  # Results to fetch per query (limits API costs)
+  resultsPerQuery: 5
+
+  # Maximum total URLs to extract per iteration (limits processing)
+  maxUrlsToExtract: 25
+
+  # Safe search level: "off" | "moderate" | "strict"
+  safeSearch: "moderate"
+
+# =============================================================================
+# Content Extraction Settings
+# =============================================================================
+extraction:
+  # Request timeout in milliseconds
+  timeoutMs: 10000
+
+  # Concurrent extraction requests
+  concurrency: 5
+
+  # Snippet length constraints (characters)
+  minSnippetLength: 200
+  maxSnippetLength: 500
+
+  # User agent for requests
+  userAgent: "Mozilla/5.0 (compatible; ResearchBot/1.0; +https://example.com/bot)"
+
+  # Maximum retries for failed extractions
+  maxRetries: 2
+
+  # Retry backoff base delay in milliseconds
+  retryDelayMs: 1000
+
+# =============================================================================
+# Research Pipeline Settings
+# =============================================================================
+research:
+  # Maximum iterations to find enough results
+  maxIterations: 3
+
+  # Default relevancy threshold (0-100)
+  # Can be overridden by project settings
+  defaultRelevancyThreshold: 60
+
+  # Default min/max results
+  # Can be overridden by project settings
+  defaultMinResults: 5
+  defaultMaxResults: 15
+
+  # LLM batch processing
+  relevancyBatchSize: 10
+
+# =============================================================================
+# Topic Clustering Settings
+# =============================================================================
+clustering:
+  # Enable topic clustering for report generation
+  enabled: true
+
+  # Similarity threshold for grouping articles (0.0 - 1.0)
+  # Higher = stricter matching, fewer clusters
+  similarityThreshold: 0.85
+
+# =============================================================================
+# Report Generation Settings
+# =============================================================================
+report:
+  # Default tone: "professional" | "casual" | "technical"
+  defaultTone: "professional"
+
+  # Maximum report length in characters
+  maxLength: 5000
+
+  # Include executive summary
+  includeExecutiveSummary: true
+
+# =============================================================================
+# Rate Limiting & Cost Control
+# =============================================================================
+# NOTE: These settings are advisory and available via getLimitsConfig().
+# They can be used by higher-level orchestration code (e.g., scheduler service)
+# to implement rate limiting and cost controls. The research engine itself
+# does not enforce these limits - it reports token usage in DeliveryStats.
+limits:
+  # Maximum tokens per research run (estimate) - for budget alerts/limits
+  maxTokensPerRun: 50000
+
+  # Delay between API calls in milliseconds (for rate limiting external APIs)
+  apiDelayMs: 100
+
+  # Maximum concurrent LLM requests (for throttling parallel LLM calls)
+  maxConcurrentLlmRequests: 3

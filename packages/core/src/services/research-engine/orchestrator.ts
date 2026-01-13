@@ -4,6 +4,9 @@
  *
  * Now uses provider interfaces for LLM and Search providers,
  * allowing easy switching between OpenAI/Gemini and Brave/ScrapingBee
+ *
+ * Configuration is loaded from research-config.yaml and can be
+ * overridden via ResearchOptions.
  */
 
 import { db } from "../firebase";
@@ -38,6 +41,12 @@ import {
 import { getSearchHistory, updateSearchHistory } from "./search-history";
 import { saveSearchResults, saveDeliveryLog } from "./result-storage";
 import type { ResearchOptions, ResearchResult } from "./types";
+import {
+  getResearchConfig,
+  getSearchConfig,
+  getClusteringConfig,
+  getReportConfig,
+} from "./config";
 
 // Default providers (can be overridden via options)
 let defaultLLMProvider: LLMProvider | null = null;
@@ -145,7 +154,26 @@ export async function executeResearchForProject(
   options?: ResearchOptions
 ): Promise<ResearchResult> {
   const startedAt = Date.now();
-  const maxIterations = options?.maxIterations || 3;
+
+  // Load configuration (from file or defaults)
+  const researchConfig = getResearchConfig();
+  const searchConfig = getSearchConfig();
+  const clusteringConfig = getClusteringConfig();
+  const reportConfig = getReportConfig();
+
+  // Merge options with config defaults
+  const maxIterations = options?.maxIterations ?? researchConfig.maxIterations;
+  const queriesPerIteration =
+    options?.queriesPerIteration ?? searchConfig.queriesPerIteration;
+  const resultsPerQuery =
+    options?.resultsPerQuery ?? searchConfig.resultsPerQuery;
+  const maxUrlsToExtract =
+    options?.maxUrlsToExtract ?? searchConfig.maxUrlsToExtract;
+  const enableClustering =
+    options?.enableClustering ?? clusteringConfig.enabled;
+  const clusteringSimilarityThreshold =
+    options?.clusteringSimilarityThreshold ??
+    clusteringConfig.similarityThreshold;
 
   // Get providers (use injected or defaults)
   const defaults = getDefaultProviders();
@@ -182,12 +210,19 @@ export async function executeResearchForProject(
       );
     }
 
-    // 3. Get settings
-    const minResults = options?.minResults || project.settings.minResults;
-    const maxResults = options?.maxResults || project.settings.maxResults;
+    // 3. Get settings (from options -> project settings -> config defaults)
+    const minResults =
+      options?.minResults ??
+      project.settings.minResults ??
+      researchConfig.defaultMinResults;
+    const maxResults =
+      options?.maxResults ??
+      project.settings.maxResults ??
+      researchConfig.defaultMaxResults;
     const relevancyThreshold =
-      options?.relevancyThreshold || project.settings.relevancyThreshold;
-    const concurrentExtractions = options?.concurrentExtractions || 3;
+      options?.relevancyThreshold ??
+      project.settings.relevancyThreshold ??
+      researchConfig.defaultRelevancyThreshold;
 
     // 4. Load search history
     const history = await getSearchHistory(userId, projectId);
@@ -201,7 +236,8 @@ export async function executeResearchForProject(
       language: project.searchParameters?.language,
       includeDomains: project.searchParameters?.priorityDomains,
       excludeDomains: project.searchParameters?.excludedDomains,
-      count: 5, // Limit results per query to save tokens/API calls
+      count: resultsPerQuery, // From config or options
+      safesearch: searchConfig.safeSearch,
     };
 
     // 5.1 Determine initial freshness based on project frequency
@@ -257,7 +293,7 @@ export async function executeResearchForProject(
         project.description,
         additionalContext,
         {
-          count: 5, // Reduced from 7 to save tokens
+          count: queriesPerIteration, // From config or options
           focusRecent:
             project.searchParameters?.dateRangePreference === "last_24h" ||
             project.searchParameters?.dateRangePreference === "last_week",
@@ -336,8 +372,8 @@ export async function executeResearchForProject(
       // but we can prioritize them if we need to limit the results
 
       // 7.3.6 Limit total URLs to extract to avoid excessive processing
-      // Take top 25 results max
-      const limitedResults = preFilteredResults.slice(0, 25);
+      // Take top N results max (from config or options)
+      const limitedResults = preFilteredResults.slice(0, maxUrlsToExtract);
 
       console.log(
         `Found ${uniqueResults.length} unique URLs. Filtered to ${limitedResults.length} for extraction.`
@@ -397,12 +433,10 @@ export async function executeResearchForProject(
         }
       }
 
-      // 7.4 Extract content
+      // 7.4 Extract content (uses extraction.concurrency from config)
       console.log(`Extracting content from ${resultsToFetch.length} URLs...`);
       const extractedContents = await extractMultipleContents(
-        resultsToFetch.map((r) => r.url),
-        undefined,
-        5 // Increased concurrency from 3 to 5
+        resultsToFetch.map((r) => r.url)
       );
 
       totalUrlsFetched += extractedContents.length;
@@ -485,7 +519,7 @@ export async function executeResearchForProject(
         contentsToAnalyze,
         {
           threshold: relevancyThreshold,
-          batchSize: 10,
+          batchSize: researchConfig.relevancyBatchSize, // From config
         }
       );
 
@@ -625,27 +659,35 @@ export async function executeResearchForProject(
         imageAlt: r.metadata.imageAlt,
       }));
 
-      // 9.1 Cluster articles by semantic similarity
-      console.log("Clustering articles by topic...");
-      const clusters = await clusterArticlesByTopic(resultsForReport, {
-        similarityThreshold: 0.85,
-      });
+      // 9.1 Cluster articles by semantic similarity (if enabled)
+      let clusters: TopicCluster[] = [];
+      if (enableClustering) {
+        console.log("Clustering articles by topic...");
+        clusters = await clusterArticlesByTopic(resultsForReport, {
+          similarityThreshold: clusteringSimilarityThreshold,
+        });
+      }
 
-      console.log(
-        `Created ${clusters.length} topic clusters from ${resultsForReport.length} articles`
-      );
+      if (enableClustering && clusters.length > 0) {
+        console.log(
+          `Created ${clusters.length} topic clusters from ${resultsForReport.length} articles`
+        );
 
-      // Track token usage for topic clustering (uses embeddings)
-      const clusterInput = JSON.stringify(resultsForReport);
-      tokenUsage.inputTokens += estimateTokens(clusterInput);
-      // Embeddings output is small (just vectors), so minimal output tokens
-      tokenUsage.outputTokens += 100;
-      tokenUsage.totalTokens = tokenUsage.inputTokens + tokenUsage.outputTokens;
+        // Track token usage for topic clustering (uses embeddings)
+        const clusterInput = JSON.stringify(resultsForReport);
+        tokenUsage.inputTokens += estimateTokens(clusterInput);
+        // Embeddings output is small (just vectors), so minimal output tokens
+        tokenUsage.outputTokens += 100;
+        tokenUsage.totalTokens =
+          tokenUsage.inputTokens + tokenUsage.outputTokens;
+      }
 
       // 9.2 Compile report using clusters if we have any multi-article clusters
-      const hasMultiArticleClusters = clusters.some(
-        (c) => c.relatedArticles.length > 0
-      );
+      const hasMultiArticleClusters =
+        enableClustering && clusters.some((c) => c.relatedArticles.length > 0);
+
+      // Get report tone from options or config
+      const reportTone = options?.reportTone ?? reportConfig.defaultTone;
 
       let compiledReport: CompiledReport;
 
@@ -672,8 +714,8 @@ export async function executeResearchForProject(
           project.description,
           resultsForReport,
           {
-            tone: "professional",
-            maxLength: 5000,
+            tone: reportTone,
+            maxLength: options?.reportMaxLength ?? reportConfig.maxLength,
             projectTitle: project.title,
             frequency: project.frequency,
           }
@@ -688,20 +730,30 @@ export async function executeResearchForProject(
           tokenUsage.inputTokens + tokenUsage.outputTokens;
       }
 
-      // 9.3 Generate executive summary from the compiled report
-      console.log("Generating executive summary...");
-      const executiveSummary = await generateReportSummaryWithRetry({
-        reportMarkdown: compiledReport.markdown,
-        projectTitle: project.title,
-        projectDescription: project.description,
-      });
+      // 9.3 Generate executive summary from the compiled report (if enabled)
+      const includeExecSummary =
+        options?.includeExecutiveSummary ??
+        reportConfig.includeExecutiveSummary;
 
-      // Track token usage for executive summary
-      const summaryInput =
-        compiledReport.markdown + project.title + project.description;
-      tokenUsage.inputTokens += estimateTokens(summaryInput) + 400; // +400 for system prompt
-      tokenUsage.outputTokens += estimateTokens(executiveSummary || "");
-      tokenUsage.totalTokens = tokenUsage.inputTokens + tokenUsage.outputTokens;
+      let executiveSummary: string | null = null;
+      if (includeExecSummary) {
+        console.log("Generating executive summary...");
+        executiveSummary = await generateReportSummaryWithRetry({
+          reportMarkdown: compiledReport.markdown,
+          projectTitle: project.title,
+          projectDescription: project.description,
+        });
+      }
+
+      // Track token usage for executive summary (if generated)
+      if (includeExecSummary && executiveSummary) {
+        const summaryInput =
+          compiledReport.markdown + project.title + project.description;
+        tokenUsage.inputTokens += estimateTokens(summaryInput) + 400; // +400 for system prompt
+        tokenUsage.outputTokens += estimateTokens(executiveSummary);
+        tokenUsage.totalTokens =
+          tokenUsage.inputTokens + tokenUsage.outputTokens;
+      }
 
       report = {
         markdown: compiledReport.markdown,

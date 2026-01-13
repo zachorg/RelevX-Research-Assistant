@@ -105,10 +105,38 @@ export type {
 export {
   executeResearchForProject,
   setDefaultProviders,
+  // Config exports
+  loadConfig,
+  getConfig,
+  clearConfigCache,
+  getConfigPath,
+  withConfigOverrides,
+  getModelConfig,
+  getDefaultLLMProvider,
+  getDefaultSearchProvider,
+  getEmbeddingsConfig,
+  getExtractionConfig,
+  getResearchConfig,
+  getClusteringConfig,
+  getReportConfig,
+  getLimitsConfig,
+  getSearchConfig,
+  DEFAULT_CONFIG,
 } from "./services/research-engine";
 export type {
   ResearchResult,
   ResearchOptions,
+  ModelOverrides,
+  // Config types
+  ResearchConfig,
+  ModelConfig,
+  LLMConfig,
+  SearchConfig as ResearchSearchConfig, // Renamed to avoid conflict with SearchFilters
+  ExtractionConfig,
+  ResearchPipelineConfig,
+  ClusteringConfig,
+  ReportConfig,
+  LimitsConfig,
 } from "./services/research-engine";
 
 // Provider Interfaces

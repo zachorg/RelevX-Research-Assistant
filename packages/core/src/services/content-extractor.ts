@@ -6,18 +6,23 @@
  * - Headings and structure
  * - Images with alt text
  * - Metadata (title, description, author, publish date)
+ *
+ * Configuration is loaded from research-config.yaml
  */
 
 import * as cheerio from "cheerio";
+import { getExtractionConfig } from "./research-engine/config";
 
 /**
  * Options for content extraction
  */
 export interface ExtractionOptions {
-  timeout?: number; // Request timeout in ms (default: 10000)
-  minSnippetLength?: number; // Minimum snippet length (default: 200)
-  maxSnippetLength?: number; // Maximum snippet length (default: 500)
-  userAgent?: string; // Custom user agent
+  timeout?: number; // Request timeout in ms (default: from config)
+  minSnippetLength?: number; // Minimum snippet length (default: from config)
+  maxSnippetLength?: number; // Maximum snippet length (default: from config)
+  userAgent?: string; // Custom user agent (default: from config)
+  maxRetries?: number; // Max retries for failed extractions (default: from config)
+  retryDelayMs?: number; // Retry delay in ms (default: from config)
 }
 
 /**
@@ -55,7 +60,7 @@ export interface ExtractedContent {
 
   // Stats
   wordCount: number;
-  
+
   // Status
   fetchStatus: "success" | "failed" | "timeout" | "blocked";
   fetchError?: string;
@@ -63,15 +68,19 @@ export interface ExtractedContent {
 }
 
 /**
- * Default extraction options
+ * Get default extraction options from config
  */
-const DEFAULT_OPTIONS: ExtractionOptions = {
-  timeout: 10000,
-  minSnippetLength: 200,
-  maxSnippetLength: 500,
-  userAgent:
-    "Mozilla/5.0 (compatible; ResearchBot/1.0; +https://example.com/bot)",
-};
+function getDefaultOptions(): Required<ExtractionOptions> {
+  const config = getExtractionConfig();
+  return {
+    timeout: config.timeoutMs,
+    minSnippetLength: config.minSnippetLength,
+    maxSnippetLength: config.maxSnippetLength,
+    userAgent: config.userAgent,
+    maxRetries: config.maxRetries,
+    retryDelayMs: config.retryDelayMs,
+  };
+}
 
 /**
  * Normalize URL for deduplication
@@ -196,7 +205,10 @@ function extractHeadings($: cheerio.CheerioAPI): string[] {
 /**
  * Extract images from the page
  */
-function extractImages($: cheerio.CheerioAPI, baseUrl: string): Array<{
+function extractImages(
+  $: cheerio.CheerioAPI,
+  baseUrl: string
+): Array<{
   src: string;
   alt?: string;
   width?: number;
@@ -257,7 +269,7 @@ function extractMetadata($: cheerio.CheerioAPI): ExtractedContent["metadata"] {
   metadata.publishedDate =
     $('meta[property="article:published_time"]').attr("content") ||
     $('meta[name="date"]').attr("content") ||
-    $('time[datetime]').attr("datetime");
+    $("time[datetime]").attr("datetime");
 
   // Keywords
   const keywordsStr = $('meta[name="keywords"]').attr("content");
@@ -288,7 +300,8 @@ export async function extractContent(
   url: string,
   options?: ExtractionOptions
 ): Promise<ExtractedContent> {
-  const opts = { ...DEFAULT_OPTIONS, ...options };
+  const defaultOpts = getDefaultOptions();
+  const opts = { ...defaultOpts, ...options };
   const fetchedAt = Date.now();
 
   try {
@@ -408,16 +421,24 @@ export async function extractContent(
 export async function extractContentWithRetry(
   url: string,
   options?: ExtractionOptions,
-  maxRetries: number = 2
+  maxRetries?: number
 ): Promise<ExtractedContent> {
+  const defaultOpts = getDefaultOptions();
+  const retryCount =
+    maxRetries ?? options?.maxRetries ?? defaultOpts.maxRetries;
+  const retryDelay = options?.retryDelayMs ?? defaultOpts.retryDelayMs;
+
   let lastError: Error | null = null;
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+  for (let attempt = 1; attempt <= retryCount; attempt++) {
     try {
       const result = await extractContent(url, options);
 
       // Don't retry on blocked or timeout (won't help)
-      if (result.fetchStatus === "blocked" || result.fetchStatus === "timeout") {
+      if (
+        result.fetchStatus === "blocked" ||
+        result.fetchStatus === "timeout"
+      ) {
         return result;
       }
 
@@ -432,9 +453,9 @@ export async function extractContentWithRetry(
       lastError = error as Error;
     }
 
-    if (attempt < maxRetries) {
-      // Wait before retry
-      const delay = 1000 * attempt; // Linear backoff for network issues
+    if (attempt < retryCount) {
+      // Wait before retry (linear backoff based on config delay)
+      const delay = retryDelay * attempt;
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
@@ -459,15 +480,16 @@ export async function extractContentWithRetry(
  */
 export async function extractMultipleContents(
   urls: string[],
-  options?: ExtractionOptions,
-  concurrency: number = 3
+  options?: ExtractionOptions
 ): Promise<ExtractedContent[]> {
+  const concurrencyLimit = getExtractionConfig().concurrency;
+
   const results: ExtractedContent[] = [];
   const queue = [...urls];
 
   // Process URLs with limited concurrency
   while (queue.length > 0) {
-    const batch = queue.splice(0, concurrency);
+    const batch = queue.splice(0, concurrencyLimit);
     const batchResults = await Promise.all(
       batch.map((url) => extractContentWithRetry(url, options))
     );
@@ -486,7 +508,9 @@ export function getContentPreview(content: ExtractedContent): string {
     `Title: ${content.title || "N/A"}`,
     `Status: ${content.fetchStatus}`,
     `Words: ${content.wordCount}`,
-    `Snippet: ${content.snippet.substring(0, 100)}${content.snippet.length > 100 ? "..." : ""}`,
+    `Snippet: ${content.snippet.substring(0, 100)}${
+      content.snippet.length > 100 ? "..." : ""
+    }`,
   ];
 
   if (content.fetchError) {
@@ -495,4 +519,3 @@ export function getContentPreview(content: ExtractedContent): string {
 
   return preview.join("\n");
 }
-
