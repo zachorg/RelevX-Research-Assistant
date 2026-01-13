@@ -16,6 +16,8 @@ import fastifyCompress from "@fastify/compress";
 import aws from "./plugins/aws.js";
 import stripeRoute from "./routes/stripeRoute.js";
 import fastifyRedis from "@fastify/redis";
+import aiRoutes from "./routes/aiRoute.js";
+import ai from "./plugins/ai.js";
 
 // Fastify app with structured logging enabled. We redact sensitive fields by
 // default to avoid leaking destinations/PII in application logs.
@@ -144,12 +146,14 @@ const start = async () => {
     await app.register(rl);
     await app.register(auth);
     await app.register(stripe);
+    await app.register(ai);
     // Business routes
     await app.register(userBillingRoutes, { prefix: "/api/v1/user/billing" });
     await app.register(stripeRoute, { prefix: "api/v1/stripe" });
     await app.register(productsRoutes, { prefix: "/api/v1/products" });
     await app.register(userAuthRoutes, { prefix: "/api/v1/user/auth" });
     await app.register(userProjectsRoutes, { prefix: "/api/v1/user/projects" });
+    await app.register(aiRoutes, { prefix: "/api/v1/ai" });
   } catch (err) {
     app.log.error(err);
     process.exit(1);

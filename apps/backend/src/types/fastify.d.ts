@@ -14,6 +14,7 @@ declare module "fastify" {
       app: import("firebase-admin/app").App;
       remoteConfig: any;
     };
+    aiInterface: LLMProvider;
     // Verify Firebase ID token and enrich with optional user/plan
     introspectIdToken: (idToken: string) => Promise<{
       user?: {

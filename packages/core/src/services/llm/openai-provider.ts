@@ -15,15 +15,12 @@ import type {
   FilteredSearchResult,
 } from "../../interfaces/llm-provider";
 import {
-  generateSearchQueries as openaiGenerateQueries,
   generateSearchQueriesWithRetry as openaiGenerateQueriesRetry,
 } from "./query-generation";
 import {
-  analyzeRelevancy as openaiAnalyzeRelevancy,
   analyzeRelevancyWithRetry as openaiAnalyzeRelevancyRetry,
 } from "./relevancy-analysis";
 import {
-  compileReport as openaiCompileReport,
   compileReportWithRetry as openaiCompileReportRetry,
 } from "./report-compilation";
 import { filterSearchResultsSafe } from "./search-filtering";
@@ -78,10 +75,9 @@ export class OpenAIProvider implements LLMProvider {
    */
   async generateSearchQueries(
     projectDescription: string,
-    additionalContext?: string,
+    _additionalContext?: string,
     options?: {
       count?: number;
-      focusRecent?: boolean;
     }
   ): Promise<GeneratedQuery[]> {
     this.ensureInitialized();
@@ -92,7 +88,7 @@ export class OpenAIProvider implements LLMProvider {
       projectDescription,
       undefined, // searchParams
       undefined, // previousQueries
-      1, // iteration
+      options?.count ??1, // iteration
       3 // maxRetries
     );
 

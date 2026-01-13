@@ -58,3 +58,11 @@ export {
   kAnalyticsUserCollection,
   kAnalyticsDailyDateKey,
 } from "./utils/analytics";
+
+export type {
+  ImproveProjectDescriptionRequest,
+  ImproveProjectDescriptionResponse,
+} from "./models/ai";
+
+export { OpenAIProvider, createOpenAIProvider } from "./services/llm";
+export type { LLMProvider } from "./interfaces/llm-provider";

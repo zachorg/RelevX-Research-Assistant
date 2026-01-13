@@ -129,7 +129,7 @@ function mergeKeyPoints(articles: ResultForReport[]): string[] {
  */
 function inferClusterTopic(
   primary: ResultForReport,
-  related: ResultForReport[]
+  _related: ResultForReport[]
 ): string {
   // For now, use the primary article's title
   // Could be enhanced with LLM summarization if needed
