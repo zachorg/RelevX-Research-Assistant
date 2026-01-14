@@ -425,7 +425,6 @@ const routes: FastifyPluginAsync = async (app) => {
             projectId,
             userId,
             destination,
-            destinationAddress,
             stats,
             resultUrls,
             ...data

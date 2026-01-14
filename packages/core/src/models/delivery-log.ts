@@ -43,7 +43,6 @@ export interface DeliveryLog {
 
   // Delivery information
   destination: "email" | "slack" | "sms"; // Where it was delivered
-  destinationAddress: string; // Email/phone/webhook that received it
 
   // Report content
   reportMarkdown: string; // The compiled markdown report
@@ -74,13 +73,7 @@ export interface NewDeliveryLog extends Omit<DeliveryLog, "id"> {}
 export interface RelevxDeliveryLog
   extends Omit<
     DeliveryLog,
-    | "id"
-    | "projectId"
-    | "userId"
-    | "destination"
-    | "destinationAddress"
-    | "stats"
-    | "resultUrls"
+    "id" | "projectId" | "userId" | "destination" | "stats" | "resultUrls"
   > {}
 
 /**
