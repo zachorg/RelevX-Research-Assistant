@@ -40,13 +40,16 @@ import {
 import { DeleteProjectDialog } from "./delete-project-dialog";
 import { EditProjectSettingsDialog } from "./edit-project-settings-dialog";
 import { ProjectDetailModal } from "./project-detail-modal";
+import { DAY_OF_WEEK_LABELS, formatDayOfMonth } from "@/lib/utils";
 
 interface ProjectCardProps {
   project: ProjectInfo;
 }
 
 export function ProjectCard({ project }: ProjectCardProps) {
-  const { toggleProjectStatus, deleteProject } = useProjects({ subscribe: false });
+  const { toggleProjectStatus, deleteProject } = useProjects({
+    subscribe: false,
+  });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
@@ -66,6 +69,17 @@ export function ProjectCard({ project }: ProjectCardProps) {
     daily: "Daily",
     weekly: "Weekly",
     monthly: "Monthly",
+  };
+
+  const getFrequencyDisplay = () => {
+    const baseLabel = frequencyLabels[project.frequency];
+    if (project.frequency === "weekly" && project.dayOfWeek !== undefined) {
+      return `${baseLabel} (${DAY_OF_WEEK_LABELS[project.dayOfWeek]})`;
+    }
+    if (project.frequency === "monthly" && project.dayOfMonth !== undefined) {
+      return `${baseLabel} (${formatDayOfMonth(project.dayOfMonth)})`;
+    }
+    return baseLabel;
   };
 
   const destinationLabels = {
@@ -132,8 +146,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
   return (
     <>
       <Card
-        className={`group hover:shadow-xl hover:shadow-primary/10 hover:scale-[1.02] transition-all duration-300 glass-dark h-full flex flex-col cursor-pointer ${project.status === "running" ? "!border-red-500 !border-2" : ""
-          }`}
+        className={`group hover:shadow-xl hover:shadow-primary/10 hover:scale-[1.02] transition-all duration-300 glass-dark h-full flex flex-col cursor-pointer ${
+          project.status === "running" ? "!border-red-500 !border-2" : ""
+        }`}
         onClick={handleCardClick}
       >
         <CardHeader>
@@ -141,7 +156,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
                 <Switch
-                  checked={project.status === "active" || project.status === "running"}
+                  checked={
+                    project.status === "active" || project.status === "running"
+                  }
                   onCheckedChange={handleToggleActive}
                   disabled={isToggling}
                 />
@@ -208,9 +225,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             <div className="flex items-center gap-2 text-sm">
               <Clock className="w-4 h-4 text-muted-foreground" />
               <span className="text-muted-foreground">Frequency:</span>
-              <span className="font-medium">
-                {frequencyLabels[project.frequency]}
-              </span>
+              <span className="font-medium">{getFrequencyDisplay()}</span>
             </div>
 
             {project.deliveryTime && project.timezone && (

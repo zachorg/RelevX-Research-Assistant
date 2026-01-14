@@ -28,6 +28,7 @@ import {
 import { useDeliveryLogs } from "@/hooks/use-delivery-logs";
 import { EditProjectSettingsDialog } from "./edit-project-settings-dialog";
 import ReactMarkdown from "react-markdown";
+import { DAY_OF_WEEK_LABELS, formatDayOfMonth } from "@/lib/utils";
 
 type TabId = "overview" | "history";
 
@@ -195,32 +196,10 @@ function OverviewTab({ project }: { project: ProjectInfo }) {
     monthly: "Monthly",
   };
 
-  const dayOfWeekLabels = [
-    "Sunday",
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-  ];
-
-  const formatDayOfMonth = (day: number) => {
-    const suffix =
-      day === 1 || day === 21 || day === 31
-        ? "st"
-        : day === 2 || day === 22
-        ? "nd"
-        : day === 3 || day === 23
-        ? "rd"
-        : "th";
-    return `${day}${suffix}`;
-  };
-
   const getFrequencyDisplay = () => {
     const baseLabel = frequencyLabels[project.frequency];
     if (project.frequency === "weekly" && project.dayOfWeek !== undefined) {
-      return `${baseLabel} (${dayOfWeekLabels[project.dayOfWeek]})`;
+      return `${baseLabel} (${DAY_OF_WEEK_LABELS[project.dayOfWeek]})`;
     }
     if (project.frequency === "monthly" && project.dayOfMonth !== undefined) {
       return `${baseLabel} (${formatDayOfMonth(project.dayOfMonth)})`;
