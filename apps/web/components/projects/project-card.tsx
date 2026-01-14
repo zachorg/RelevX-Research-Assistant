@@ -28,15 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import {
-  MoreVertical,
-  Settings,
-  Trash2,
-  Clock,
-  Mail,
-  Calendar,
-  Circle,
-} from "lucide-react";
+import { MoreVertical, Settings, Trash2, Clock, Calendar } from "lucide-react";
 import { DeleteProjectDialog } from "./delete-project-dialog";
 import { EditProjectSettingsDialog } from "./edit-project-settings-dialog";
 import { ProjectDetailModal } from "./project-detail-modal";
@@ -80,24 +72,6 @@ export function ProjectCard({ project }: ProjectCardProps) {
       return `${baseLabel} (${formatDayOfMonth(project.dayOfMonth)})`;
     }
     return baseLabel;
-  };
-
-  const destinationLabels = {
-    email: "Email",
-    slack: "Slack",
-    sms: "SMS",
-    none: "In-App Only",
-  };
-
-  const getDestinationIcon = () => {
-    switch (project.resultsDestination) {
-      case "email":
-        return <Mail className="w-4 h-4" />;
-      case "slack":
-        return <Mail className="w-4 h-4" />; // You could use a Slack icon here
-      default:
-        return <Circle className="w-4 h-4" />;
-    }
   };
 
   const formatTime12Hour = (time24: string) => {
@@ -239,14 +213,6 @@ export function ProjectCard({ project }: ProjectCardProps) {
                 </span>
               </div>
             )}
-
-            <div className="flex items-center gap-2 text-sm">
-              {getDestinationIcon()}
-              <span className="text-muted-foreground">Delivery:</span>
-              <span className="font-medium">
-                {destinationLabels[project.resultsDestination]}
-              </span>
-            </div>
           </div>
         </CardContent>
 
