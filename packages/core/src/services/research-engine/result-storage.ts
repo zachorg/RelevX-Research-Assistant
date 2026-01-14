@@ -1,54 +1,11 @@
 /**
  * Result and delivery log storage
- * Handles saving search results and delivery logs to Firestore
+ * Handles saving delivery logs to Firestore
  */
 
 import { db } from "../firebase";
 import type { Project } from "../../models/project";
-import type { SearchResult, NewSearchResult } from "../../models/search-result";
 import type { NewDeliveryLog, DeliveryStats } from "../../models/delivery-log";
-
-/**
- * Save search results to Firestore
- */
-export async function saveSearchResults(
-  userId: string,
-  projectId: string,
-  results: SearchResult[]
-): Promise<string[]> {
-  const resultsCollection = db
-    .collection("users")
-    .doc(userId)
-    .collection("projects")
-    .doc(projectId)
-    .collection("searchResults");
-
-  const resultIds: string[] = [];
-
-  for (const result of results) {
-    const resultData: NewSearchResult = {
-      projectId: result.projectId,
-      userId: result.userId,
-      url: result.url,
-      normalizedUrl: result.normalizedUrl,
-      sourceQuery: result.sourceQuery,
-      searchEngine: result.searchEngine,
-      snippet: result.snippet,
-      fullContent: result.fullContent,
-      relevancyScore: result.relevancyScore,
-      relevancyReason: result.relevancyReason,
-      metadata: result.metadata,
-      fetchedAt: result.fetchedAt,
-      fetchStatus: result.fetchStatus,
-      fetchError: result.fetchError,
-    };
-
-    const docRef = await resultsCollection.add(resultData);
-    resultIds.push(docRef.id);
-  }
-
-  return resultIds;
-}
 
 /**
  * Save delivery log to Firestore
@@ -65,7 +22,7 @@ export async function saveDeliveryLog(
     resultCount?: number;
   },
   stats: DeliveryStats,
-  searchResultIds: string[],
+  resultUrls: string[],
   researchStartedAt: number,
   researchCompletedAt: number,
   status: "pending" | "success" | "failed" | "partial" = "pending"
@@ -115,7 +72,7 @@ export async function saveDeliveryLog(
     stats,
     status, // Can be "pending" for pre-runs, "success" for immediate delivery
     retryCount: 0,
-    searchResultIds,
+    resultUrls,
     researchStartedAt,
     researchCompletedAt,
   };

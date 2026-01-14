@@ -15,7 +15,7 @@
 
 export { executeResearchForProject, setDefaultProviders } from "./orchestrator";
 export { getSearchHistory, updateSearchHistory } from "./search-history";
-export { saveSearchResults, saveDeliveryLog } from "./result-storage";
+export { saveDeliveryLog } from "./result-storage";
 export type { ResearchOptions, ResearchResult, ModelOverrides } from "./types";
 
 // Config exports

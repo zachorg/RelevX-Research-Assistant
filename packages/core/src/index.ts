@@ -185,7 +185,7 @@ export {
   isProjectDue,
 } from "./utils/scheduling";
 
-export { saveSearchResults } from "./services/research-engine/result-storage";
+export { saveDeliveryLog } from "./services/research-engine/result-storage";
 
 export { sendReportEmail } from "./services/email";
 

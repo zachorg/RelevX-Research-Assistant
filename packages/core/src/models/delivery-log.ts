@@ -59,7 +59,7 @@ export interface DeliveryLog {
   retryCount: number; // Number of delivery retry attempts
 
   // References
-  searchResultIds: string[]; // IDs of SearchResults included in this report
+  resultUrls: string[]; // URLs of results included in this report
 
   // Timestamps
   researchStartedAt: number; // When the research process started
@@ -80,7 +80,7 @@ export interface RelevxDeliveryLog
     | "destination"
     | "destinationAddress"
     | "stats"
-    | "searchResultIds"
+    | "resultUrls"
   > {}
 
 /**
