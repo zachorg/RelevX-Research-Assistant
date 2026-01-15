@@ -53,25 +53,21 @@ async function update_topdown_analytics_completed_research(
             (num_completed_daily_research[dailyKey] || 0) + numResearch,
         },
       } as TopDownAnalyticsDocument,
-      { merge: true }
+      { merge: false } // we don't want to merge, we want to overwrite the entire document
     );
   });
 }
 
-export async function check_and_increment_research_usage(
-  onRun: () => Promise<any>,
+async function try_increment_research_usage(
   db: Firestore,
   userId: string,
   plan: Plan,
   projectTitle: string
 ): Promise<any> {
-  if (!db) {
-    throw new Error("Firebase firestore not initialized");
-  }
-
   const dateKey = kAnalyticsDailyDateKey(new Date()); // YYYY-MM-DD format
   const usageRef = db.doc(kAnalyticsUserCollection(userId, dateKey));
 
+  // assume onRun is a success
   const result: any = await db.runTransaction(async (transaction) => {
     const usageDoc = await transaction.get(usageRef);
 
@@ -96,24 +92,97 @@ export async function check_and_increment_research_usage(
       return null;
     }
 
-    const value = await onRun();
-    if (value) {
-      completed_daily_projects.push(projectTitle);
-      transaction.set(
-        usageRef,
-        {
-          ...data,
-          num_completed_daily_research_projects: completed_daily_projects,
-        } as UserAnalyticsDocument,
-        { merge: true }
-      );
+    completed_daily_projects.push(projectTitle);
+    transaction.set(
+      usageRef,
+      {
+        ...data,
+        num_completed_daily_research_projects: completed_daily_projects,
+      } as UserAnalyticsDocument,
+      { merge: false } // we don't want to merge, we want to overwrite the entire document
+    );
 
-      // no need to wait for this to complete
-      update_topdown_analytics_completed_research(db, 1);
-    }
-
-    return value;
+    // no need to wait for this to complete
+    update_topdown_analytics_completed_research(db, 1);
+    return true;
   });
 
   return result;
+}
+
+async function decrement_research_usage(
+  db: Firestore,
+  userId: string,
+  projectTitle: string
+): Promise<any> {
+  const dateKey = kAnalyticsDailyDateKey(new Date()); // YYYY-MM-DD format
+  const usageRef = db.doc(kAnalyticsUserCollection(userId, dateKey));
+
+  // assume onRun is a success
+  const result: any = await db.runTransaction(async (transaction) => {
+    const usageDoc = await transaction.get(usageRef);
+
+    let data: UserAnalyticsDocument = {
+      num_completed_daily_research_projects: [],
+      num_completed_research: 0,
+    };
+    if (usageDoc.exists) {
+      data = usageDoc.data() as UserAnalyticsDocument;
+    }
+
+    let completed_daily_projects: string[] =
+      data.num_completed_daily_research_projects || [];
+
+    completed_daily_projects = completed_daily_projects.filter(
+      (id) => id !== projectTitle
+    );
+    transaction.set(
+      usageRef,
+      {
+        ...data,
+        num_completed_daily_research_projects: completed_daily_projects,
+      } as UserAnalyticsDocument,
+      { merge: false } // we don't want to merge, we want to overwrite the entire document
+    );
+
+    // no need to wait for this to complete
+    update_topdown_analytics_completed_research(db, -1);
+    return true;
+  });
+
+  return result;
+}
+
+export async function check_and_increment_research_usage(
+  onRun: () => Promise<any>,
+  db: Firestore,
+  userId: string,
+  plan: Plan,
+  projectTitle: string
+): Promise<any> {
+  if (!db) {
+    throw new Error("Firebase firestore not initialized");
+  }
+
+  // first increment the research usage -- if this fails, we don't need to execute the onRun function
+  let result = await try_increment_research_usage(
+    db,
+    userId,
+    plan,
+    projectTitle
+  );
+
+  // execute the onRun function
+  if (result) {
+    const value = await onRun();
+    if (!value) {
+      // no need to wait for this to complete
+      // decrement the research usage
+      // -- this project will get executed again ASAP..
+      decrement_research_usage(db, userId, projectTitle);
+    }
+    return value;
+  }
+
+  return null;
 }

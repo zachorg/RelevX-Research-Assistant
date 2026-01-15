@@ -61,6 +61,10 @@ export interface ResearchOptions {
   // === Full Config Override ===
   // Provide a complete config object to override all defaults
   config?: Partial<ResearchConfig>;
+
+  // === Force Research ===
+  // write to DB are not allowed when forceResearch is true.
+  forceResearch?: boolean; // Force research execution (default: false)
 }
 
 /**

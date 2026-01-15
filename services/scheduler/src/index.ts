@@ -13,6 +13,7 @@ import { logger } from "./logger";
 import { Filter } from "firebase-admin/firestore";
 import { loadAwsSecrets } from "./plugins/aws";
 import { Queue } from "elegant-queue";
+import { Mutex } from "async-mutex";
 
 // Import types from core package
 import type { NewDeliveryLog, Plan, Project, RelevxUserProfile } from "core";
@@ -157,12 +158,20 @@ async function createAdminNotification(
   }
 }
 
+const gResearchQueueMutex = new Mutex();
+interface PolledProject {
+  userId: string;
+  project: Project;
+  projectRef: any;
+  isRetry: boolean;
+}
+
 /**
  * Research Job
  * Handles both pre-runs (ahead of delivery time) AND retries (already due)
  * Any project without prepared results gets researched
  */
-async function runResearchJob(): Promise<void> {
+async function runResearchJob(scheduledJobNumber: number): Promise<void> {
   // Ensure providers are initialized
   await initializeProviders();
 
@@ -171,13 +180,6 @@ async function runResearchJob(): Promise<void> {
   const now = Date.now();
   const checkWindowMs = getCheckWindowMs();
   const prerunMaxTime = now + checkWindowMs;
-
-  interface PolledProject {
-    userId: string;
-    project: Project;
-    projectRef: any;
-    isRetry: boolean;
-  }
 
   // polls projects that need research
   const pollResearchProjects = async (): Promise<Array<PolledProject>> => {
@@ -307,22 +309,9 @@ async function runResearchJob(): Promise<void> {
     // 4). Execute research
     const deliveryLogId = await check_and_increment_research_usage(
       async () => {
-        // Execute research (this will save with default "success" status)
-        // We need to pass the status through the options
         const result = await executeResearchForProject(userId, project.id);
 
-        if (result.success && result.deliveryLogId) {
-          logger.info("Research execution completed successfully", {
-            userId,
-            projectId: project.id,
-            resultsCount: result.relevantResults.length,
-            durationMs: result.durationMs,
-            deliveryLogId: result.deliveryLogId,
-            status: project.status,
-          });
-
-          return result.deliveryLogId;
-        } else {
+        if (!result.success || !result.deliveryLogId) {
           throw new Error(
             getErrorMessage(
               "E0",
@@ -332,6 +321,8 @@ async function runResearchJob(): Promise<void> {
             )
           );
         }
+
+        return result.deliveryLogId;
       },
       db,
       userId,
@@ -347,12 +338,21 @@ async function runResearchJob(): Promise<void> {
 
     // 5). Update project status based on research result
     if (deliveryLogId) {
+      // Calculate next run time
+      const nextRunAt = calculateNextRunAt(
+        project.frequency,
+        project.deliveryTime,
+        project.timezone,
+        project.dayOfWeek,
+        project.dayOfMonth
+      );
+
       // Success - prepare project for delivery
       projectUpdates = {
         ...projectUpdates,
         lastError: null,
         preparedDeliveryLogId: deliveryLogId,
-        status: "active",
+        nextRunAt,
         preparedAt: Date.now(),
         deliveredAt: null,
       };
@@ -364,8 +364,8 @@ async function runResearchJob(): Promise<void> {
       logger.info(`${isRetry ? "Retry" : "Pre-run"} research succeeded`, {
         userId,
         projectId: project.id,
-        deliveryLogId,
-        retryAttempt,
+        projectUpdates: projectUpdates,
+        retryAttempt: retryAttempt,
       });
     }
     // else if (isRetry && project.lastError) {
@@ -396,81 +396,86 @@ async function runResearchJob(): Promise<void> {
 
     await projectRef.update(projectUpdates);
   };
+
   try {
-    logger.debug("Running research job", {
-      checkingFrom: new Date(now).toISOString(),
-      checkingUntil: new Date(prerunMaxTime).toISOString(),
-      windowMinutes: checkWindowMs / 60000,
-    });
+    await gResearchQueueMutex.runExclusive(async () => {
+      logger.debug("Running research job", {
+        jobNumber: scheduledJobNumber,
+        checkingFrom: new Date(now).toISOString(),
+        checkingUntil: new Date(prerunMaxTime).toISOString(),
+        windowMinutes: checkWindowMs / 60000,
+      });
 
-    // poll research projects
-    let projectsToRun: Array<PolledProject> = await pollResearchProjects();
+      // poll research projects
+      let projectsToRun: Array<PolledProject> = await pollResearchProjects();
 
-    if (projectsToRun.length === 0) {
-      logger.debug("No projects need research");
-      return;
-    }
+      if (projectsToRun.length === 0) {
+        logger.debug("No projects need research");
+        return;
+      }
 
-    // avoid race conditions if a project takes longer than a minute to run...
-    markPolledProjectsAsRunning(projectsToRun);
+      // avoid race conditions if a project takes longer than a minute to run...
+      await markPolledProjectsAsRunning(projectsToRun);
 
-    const prerunCount = projectsToRun.filter((p) => !p.isRetry).length;
-    const retryCount = projectsToRun.filter((p) => p.isRetry).length;
+      const prerunCount = projectsToRun.filter((p) => !p.isRetry).length;
+      const retryCount = projectsToRun.filter((p) => p.isRetry).length;
 
-    logger.info(`Research needed for ${projectsToRun.length} projects`, {
-      prerun: prerunCount,
-      retry: retryCount,
-      projectsToRun,
-    });
+      logger.info(`Researching ${projectsToRun.length} projects`, {
+        prerun: prerunCount,
+        retry: retryCount,
+      });
 
-    // Execute research for each project
-    for (const polledProject of projectsToRun) {
-      try {
-        await executeResearch(polledProject);
-      } catch (error: any) {
-        logger.error("Research execution error", {
-          userId: polledProject.userId,
-          projectId: polledProject.project.id,
-          isRetry: polledProject.isRetry,
-          error: error.message,
-        });
-        const splits = error.message.split(":")[0];
-        const errorCode = splits[0];
-        const userId = splits[1];
-        const projectId = splits[2];
-        const errorMessage = splits[3];
-
-        // E1 is for daily limit exceeded -- that means we do not need to error out the project..
-        if (errorCode !== "E1") {
-          // Update project with error status
+      // execute research for each project
+      await Promise.all(
+        projectsToRun.map(async (polledProject) => {
           try {
-            const { db } = await import("core");
-            await db
-              .collection("users")
-              .doc(userId)
-              .collection("projects")
-              .doc(projectId)
-              .update({
-                status: "error",
-                lastError: errorMessage,
-                researchStartedAt: null,
-                updatedAt: Date.now(),
-              });
-          } catch (updateError: any) {
-            logger.error("Failed to update project error status", {
-              userId,
-              projectId,
-              error: updateError.message,
+            await executeResearch(polledProject);
+          } catch (error: any) {
+            logger.error("Research execution error", {
+              userId: polledProject.userId,
+              projectId: polledProject.project.id,
+              isRetry: polledProject.isRetry,
+              error: error.message,
+            });
+            const splits = error.message.split(":");
+            const errorCode = splits[0];
+            const userId = splits[1];
+            const projectId = splits[2];
+            const errorMessage = splits[3];
+
+            // E1 is for daily limit exceeded -- that means we do not need to error out the project..
+            if (errorCode !== "E1") {
+              // Update project with error status
+              try {
+                const { db } = await import("core");
+                await db
+                  .collection("users")
+                  .doc(userId)
+                  .collection("projects")
+                  .doc(projectId)
+                  .update({
+                    status: "error",
+                    lastError: errorMessage,
+                    researchStartedAt: null,
+                    updatedAt: Date.now(),
+                  });
+              } catch (updateError: any) {
+                logger.error("Failed to update project error status", {
+                  userId,
+                  projectId,
+                  error: updateError.message,
+                });
+              }
+            }
+
+            logger.error("Research execution error", {
+              error: error.message,
+              stack: error.stack,
             });
           }
-        }
-
-        logger.error("Research execution error", {
-          error: error.message,
-          stack: error.stack,
-        });
-      }
-    }
+        })
+      );
+    });
   } catch (error: any) {
     logger.error("Research job failed", {
       error: error.message,
@@ -492,12 +497,14 @@ interface DeliveryItem {
  * Delivery Job
  * Check for projects ready to deliver (have preparedDeliveryLogId)
  */
-async function runDeliveryJob(): Promise<void> {
+async function runDeliveryJob(scheduledJobNumber: number): Promise<void> {
   try {
     const { db } = await import("core");
     const now = Date.now();
 
-    logger.debug("Running delivery job");
+    logger.debug("Running delivery job", {
+      jobNumber: scheduledJobNumber,
+    });
 
     // Query all users
     // @TODO: Instead of using users to query projects, use projects collection altogether and then reference the user from the project
@@ -652,19 +659,9 @@ async function runDeliveryQueue() {
               deliveredAt: Date.now(),
             });
 
-            // Calculate next run time
-            const nextRunAt = calculateNextRunAt(
-              project.frequency,
-              project.deliveryTime,
-              project.timezone,
-              project.dayOfWeek,
-              project.dayOfMonth
-            );
-
             // Update project
             await projectRef.update({
               lastRunAt: now,
-              nextRunAt,
               preparedDeliveryLogId: null,
               updatedAt: Date.now(),
             });
@@ -673,7 +670,6 @@ async function runDeliveryQueue() {
               userId,
               projectId: project.id,
               deliveryLogId: project.preparedDeliveryLogId,
-              nextRunAt: new Date(nextRunAt).toISOString(),
             });
           } else {
             logger.error("Failed to send email:", emailResult.error);
@@ -695,7 +691,7 @@ async function runDeliveryQueue() {
 /**
  * Main scheduler job - runs every minute
  */
-async function runSchedulerJob(): Promise<void> {
+async function runSchedulerJob(scheduledJobNumber: number): Promise<void> {
   logger.debug("Scheduler job started");
   const startTime = Date.now();
 
@@ -703,7 +699,10 @@ async function runSchedulerJob(): Promise<void> {
     // Run both jobs in parallel
     // Research job handles both pre-runs and retries
     // Delivery job handles marking prepared results as sent and sending emails
-    await Promise.all([runResearchJob(), runDeliveryJob()]);
+    await Promise.all([
+      runResearchJob(scheduledJobNumber),
+      runDeliveryJob(scheduledJobNumber),
+    ]);
 
     const duration = Date.now() - startTime;
     logger.debug("Scheduler job completed", {
@@ -763,7 +762,7 @@ async function startScheduler(): Promise<void> {
   // Run once at startup (optional, can be disabled)
   if (process.env.RUN_ON_STARTUP !== "false") {
     logger.info("Running initial scheduler job");
-    await runSchedulerJob();
+    await runSchedulerJob(0);
   }
 
   // Set up cron job to run every minute
@@ -772,14 +771,23 @@ async function startScheduler(): Promise<void> {
 
   logger.info("Setting up cron job", { schedule: cronExpression });
 
-  // this can cause race conditions.
+  let scheduledJobNumber = 0;
   cron.schedule(cronExpression, async () => {
-    await runSchedulerJob();
+    scheduledJobNumber = scheduledJobNumber + 1;
+    await runSchedulerJob(scheduledJobNumber);
   });
+
   // Run delivery queue every 1.2second
+  const maxConcurrentDeliveryJobs = 1;
+  let currentConcurrentDeliveryJobs = 0;
   setInterval(async () => {
+    currentConcurrentDeliveryJobs = currentConcurrentDeliveryJobs + 1;
+    if (currentConcurrentDeliveryJobs > maxConcurrentDeliveryJobs) {
+      return;
+    }
     await runDeliveryQueue();
-  }, 1200);
+    currentConcurrentDeliveryJobs = currentConcurrentDeliveryJobs - 1;
+  }, 1200); // 1 minute
 
   logger.info("Scheduler service started successfully", {
     schedule: "Every minute",

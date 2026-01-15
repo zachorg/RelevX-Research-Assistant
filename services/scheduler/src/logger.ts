@@ -72,4 +72,4 @@ class Logger {
 }
 
 // Export singleton instance
-export const logger = new Logger((process.env.LOG_LEVEL as LogLevel) || "info");
+export const logger = new Logger((process.env.LOG_LEVEL as LogLevel) || "debug");

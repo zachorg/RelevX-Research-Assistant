@@ -155,6 +155,9 @@ export async function executeResearchForProject(
 ): Promise<ResearchResult> {
   const startedAt = Date.now();
 
+  const isForcedResearch = options && (options.forceResearch ?? false);
+  const isAllowedToWriteToDb = !isForcedResearch;
+
   // Load configuration (from file or defaults)
   const researchConfig = getResearchConfig();
   const searchConfig = getSearchConfig();
@@ -199,16 +202,17 @@ export async function executeResearchForProject(
     const project = { id: projectDoc.id, ...projectDoc.data() } as Project;
 
     // 2. Validate frequency (prevent running too often)
-    if (
-      !options?.ignoreFrequencyCheck &&
-      !validateFrequency(/*project.frequency,*/ project.lastRunAt)
-    ) {
-      throw new Error(
-        `E1:${userId}:${projectId}:Project cannot be run more than once per day. Last run: ${new Date(
-          project.lastRunAt!
-        ).toISOString()}`
-      );
-    }
+    // frequency checks should not be done here, it should be done in the scheduler
+    // if (
+    //   !options?.ignoreFrequencyCheck &&
+    //   !validateFrequency(/*project.frequency,*/ project.lastRunAt)
+    // ) {
+    //   throw new Error(
+    //     `E1:${userId}:${projectId}:Project cannot be run more than once per day. Last run: ${new Date(
+    //       project.lastRunAt!
+    //     ).toISOString()}`
+    //   );
+    // }
 
     // 3. Get settings (from options -> project settings -> config defaults)
     const minResults =
@@ -797,16 +801,18 @@ export async function executeResearchForProject(
         llmModel: llmProvider.getModel(),
       };
 
-      deliveryLogId = await saveDeliveryLog(
-        userId,
-        projectId,
-        project,
-        report,
-        stats,
-        resultUrls,
-        startedAt,
-        Date.now()
-      );
+      if (isAllowedToWriteToDb) {
+        deliveryLogId = await saveDeliveryLog(
+          userId,
+          projectId,
+          project,
+          report,
+          stats,
+          resultUrls,
+          startedAt,
+          Date.now()
+        );
+      }
 
       // 11. Update search history
       const newProcessedUrls: ProcessedUrl[] = sortedResults.map((r) => ({
@@ -818,12 +824,14 @@ export async function executeResearchForProject(
         wasIncluded: true,
       }));
 
-      await updateSearchHistory(
-        userId,
-        projectId,
-        newProcessedUrls,
-        queryPerformanceMap
-      );
+      if (isAllowedToWriteToDb) {
+        await updateSearchHistory(
+          userId,
+          projectId,
+          newProcessedUrls,
+          queryPerformanceMap
+        );
+      }
     }
 
     const completedAt = Date.now();

@@ -120,22 +120,14 @@ async function forceResearch(
       console.log("⚠️ User profile not found\n");
     }
 
-    // 2. Update project status to running
-    console.log("🔄 Updating project status to running...");
-    await projectRef.update({
-      status: "running",
-      researchStartedAt: Date.now(),
-      updatedAt: Date.now(),
-    });
-    console.log("✓ Status updated\n");
-
-    // 3. Execute research
+    // 2). Execute research
     console.log("🔍 Executing research...\n");
     console.log("-".repeat(60));
 
     const result = await executeResearchForProject(userId, projectId, {
       maxIterations,
       ignoreFrequencyCheck: skipScheduleCheck,
+      forceResearch: true,
     });
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -178,84 +170,36 @@ async function forceResearch(
       console.log(`  Average Score: ${result.report.averageScore}\n`);
     }
 
-    if (result.deliveryLogId) {
-      console.log(`Delivery Log ID: ${result.deliveryLogId}\n`);
+    const deliveryEmail = project.deliveryConfig?.email?.address || userEmail;
 
-      const deliveryEmail = project.deliveryConfig?.email?.address || userEmail;
+    // 4. Send email immediately if we have a report and email address
+    if (result.report && deliveryEmail) {
+      console.log(`📧 Sending report email to ${deliveryEmail}...`);
 
-      // 4. Send email immediately if we have a report and email address
-      if (result.report && deliveryEmail) {
-        console.log(`📧 Sending report email to ${deliveryEmail}...`);
-
-        const emailResult = await sendReportEmail(
-          deliveryEmail,
-          {
-            title: result.report.title,
-            markdown: result.report.markdown,
-          },
-          projectId,
-          {
-            summary: result.report.summary,
-            resultCount: result.relevantResults.length,
-            averageScore: Math.round(result.report.averageScore),
-          }
-        );
-
-        if (emailResult.success) {
-          console.log(`✓ Email sent successfully (ID: ${emailResult.id})\n`);
-
-          // Update delivery log status to success
-          const deliveryLogRef = projectRef
-            .collection("deliveryLogs")
-            .doc(result.deliveryLogId);
-
-          await deliveryLogRef.update({
-            status: "success",
-            deliveredAt: Date.now(),
-          });
-          console.log("✓ Delivery log marked as delivered\n");
-        } else {
-          console.error(`✗ Failed to send email: ${emailResult.error}\n`);
-
-          // Mark delivery log as failed
-          const deliveryLogRef = projectRef
-            .collection("deliveryLogs")
-            .doc(result.deliveryLogId);
-
-          await deliveryLogRef.update({
-            status: "failed",
-            lastError: emailResult.error?.message || "Email send failed",
-          });
+      const emailResult = await sendReportEmail(
+        deliveryEmail,
+        {
+          title: result.report.title,
+          markdown: result.report.markdown,
+        },
+        projectId,
+        {
+          summary: result.report.summary,
+          resultCount: result.relevantResults.length,
+          averageScore: Math.round(result.report.averageScore),
         }
-      } else if (result.report && !deliveryEmail) {
-        console.log(
-          `⚠️  Email not configured. Set deliveryConfig.email.address in project settings or ensure user profile has an email.\n`
-        );
+      );
 
-        // Mark as pending since we couldn't send
-        const deliveryLogRef = projectRef
-          .collection("deliveryLogs")
-          .doc(result.deliveryLogId);
-
-        await deliveryLogRef.update({
-          status: "pending",
-          preparedAt: Date.now(),
-        });
-        console.log("✓ Delivery log marked as pending\n");
+      if (emailResult.success) {
+        console.log(`✓ Email sent successfully (ID: ${emailResult.id})\n`);
+      } else {
+        console.error(`✗ Failed to send email: ${emailResult.error}\n`);
       }
+    } else if (result.report && !deliveryEmail) {
+      console.log(
+        `⚠️  Email not configured. Set deliveryConfig.email.address in project settings or ensure user profile has an email.\n`
+      );
     }
-
-    // 5. Update project status back to active
-    console.log("✅ Updating project status to active...");
-    const updates: any = {
-      status: "active",
-      researchStartedAt: null,
-      lastError: null,
-      updatedAt: Date.now(),
-    };
-
-    await projectRef.update(updates);
-    console.log("✓ Project status updated\n");
 
     // 6. Show summary
     console.log("=".repeat(60));
@@ -277,25 +221,6 @@ async function forceResearch(
     if (error.stack) {
       console.error("\nStack trace:");
       console.error(error.stack);
-    }
-
-    // Try to update project status to error
-    try {
-      const projectRef = db
-        .collection("users")
-        .doc(userId)
-        .collection("projects")
-        .doc(projectId);
-
-      await projectRef.update({
-        status: "error",
-        lastError: error.message,
-        researchStartedAt: null,
-        updatedAt: Date.now(),
-      });
-      console.error("\n✓ Project status updated to error\n");
-    } catch (updateError) {
-      console.error("\n✗ Failed to update project status\n");
     }
 
     process.exit(1);
