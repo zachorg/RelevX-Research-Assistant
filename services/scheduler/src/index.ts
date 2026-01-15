@@ -672,6 +672,8 @@ async function runDeliveryQueue() {
               deliveryLogId: project.preparedDeliveryLogId,
             });
           } else {
+            // enqueue the delivery item again so it can be retried
+            gDeliveryQueue.enqueue(deliveryItem);
             logger.error("Failed to send email:", emailResult.error);
           }
         } catch (emailError) {
