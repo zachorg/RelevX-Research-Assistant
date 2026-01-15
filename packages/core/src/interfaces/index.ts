@@ -2,14 +2,18 @@
  * Provider interfaces for dependency injection
  */
 
+export type { LLMProvider } from "./../services/llm/index";
 export type {
-  LLMProvider,
   GeneratedQuery,
   ContentToAnalyze,
   RelevancyResult,
   ResultForReport,
   CompiledReport,
-} from "./llm-provider";
+  LlmMessage,
+  SearchResultToFilter,
+  FilteredSearchResult,
+  TopicCluster,
+} from "./../services/llm/types";
 
 export type {
   SearchProvider,

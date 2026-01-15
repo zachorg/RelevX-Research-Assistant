@@ -4,13 +4,17 @@
  */
 
 import type {
-  LLMProvider,
   GeneratedQuery,
   ContentToAnalyze,
   RelevancyResult,
   ResultForReport,
   CompiledReport,
-} from "../../interfaces/llm-provider";
+  FilteredSearchResult,
+  LlmMessage,
+  SearchResultToFilter,
+  TopicCluster,
+} from "core/services/llm/types";
+import { LLMProvider } from "core/interfaces";
 
 export interface HybridProviderConfig {
   queryProvider: LLMProvider;
@@ -27,6 +31,18 @@ export class HybridProvider implements LLMProvider {
     this.queryProvider = config.queryProvider;
     this.analysisProvider = config.analysisProvider;
     this.reportProvider = config.reportProvider;
+  }
+  query(messages: Array<LlmMessage>, temperature?: number): Promise<JSON> {
+    throw new Error("Method not implemented.");
+  }
+  filterSearchResults?(results: SearchResultToFilter[], projectDescription: string): Promise<FilteredSearchResult[]> {
+    throw new Error("Method not implemented.");
+  }
+  clusterByTopic?(results: ResultForReport[], options?: { similarityThreshold?: number; }): Promise<TopicCluster[]> {
+    throw new Error("Method not implemented.");
+  }
+  compileClusteredReport?(projectDescription: string, clusters: TopicCluster[], options?: { tone?: "professional" | "casual" | "technical"; maxLength?: number; projectTitle?: string; frequency?: "daily" | "weekly" | "monthly"; }): Promise<CompiledReport> {
+    throw new Error("Method not implemented.");
   }
 
   /**

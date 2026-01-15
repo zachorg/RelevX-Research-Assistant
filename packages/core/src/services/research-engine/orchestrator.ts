@@ -15,13 +15,13 @@ import type { SearchResult } from "../../models/search-result";
 import type { ProcessedUrl } from "../../models/search-history";
 import type { DeliveryStats } from "../../models/delivery-log";
 import type {
-  LLMProvider,
   ContentToAnalyze,
   ResultForReport,
   CompiledReport,
   TopicCluster,
-} from "../../interfaces/llm-provider";
-import { clusterArticlesByTopic } from "../llm/topic-clustering";
+} from "./../../services/llm/types";
+import { LLMProvider } from "./../../interfaces";
+import { clusterArticlesByTopic } from "./../../services/llm/topic-clustering";
 import {
   compileClusteredReport,
   generateReportSummaryWithRetry,

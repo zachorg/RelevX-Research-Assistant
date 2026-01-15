@@ -10,13 +10,15 @@ import {
   GenerativeModel,
 } from "@google/generative-ai";
 import type {
-  LLMProvider,
   GeneratedQuery,
   ContentToAnalyze,
   RelevancyResult,
   ResultForReport,
   CompiledReport,
-} from "../../interfaces/llm-provider";
+  LlmMessage,
+  TopicCluster,
+} from "core/services/llm/types";
+import { LLMProvider } from "core/interfaces";
 import {
   QUERY_GENERATION_PROMPTS,
   RELEVANCY_ANALYSIS_PROMPTS,
@@ -42,6 +44,27 @@ export class GeminiProvider implements LLMProvider {
         },
       ],
     });
+  }
+  query(messages: Array<LlmMessage>, temperature?: number): Promise<JSON> {
+    throw new Error("Method not implemented.");
+  }
+  clusterByTopic?(
+    results: ResultForReport[],
+    options?: { similarityThreshold?: number }
+  ): Promise<TopicCluster[]> {
+    throw new Error("Method not implemented.");
+  }
+  compileClusteredReport?(
+    projectDescription: string,
+    clusters: TopicCluster[],
+    options?: {
+      tone?: "professional" | "casual" | "technical";
+      maxLength?: number;
+      projectTitle?: string;
+      frequency?: "daily" | "weekly" | "monthly";
+    }
+  ): Promise<CompiledReport> {
+    throw new Error("Method not implemented.");
   }
 
   /**

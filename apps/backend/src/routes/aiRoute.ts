@@ -33,10 +33,24 @@ const routes: FastifyPluginAsync = async (app) => {
             .status(400)
             .send({ error: { message: "Description is required" } });
         }
-        const response = await aiInterface.generateSearchQueries(request.description, undefined, { count: 1, focusRecent: false });
+        const response = await aiInterface.query([
+          {
+            role: "user",
+            content: `
+You are a helpful assistant that improves project descriptions.
+Project Description: ${request.description}
+Constraints: 1). It should clearly state everything that needs to be researched. It should be specific and detailed. 2). Should not be 'This project aims', that is obvious. 3). Should be a list of items, not a paragraph.
+
+Return ONLY a JSON object with this structure:
+{
+  "description": "the improved project description"
+}
+`,
+          },
+        ]);
 
         return rep.status(200).send({
-          description: response[0].query,
+          description: response.description,
         } as ImproveProjectDescriptionResponse);
       } catch (err: any) {
         const isDev = process.env.NODE_ENV !== "production";

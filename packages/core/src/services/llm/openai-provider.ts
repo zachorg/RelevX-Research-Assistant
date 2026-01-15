@@ -5,7 +5,6 @@
  */
 
 import type {
-  LLMProvider,
   GeneratedQuery,
   ContentToAnalyze,
   RelevancyResult,
@@ -13,18 +12,16 @@ import type {
   CompiledReport,
   SearchResultToFilter,
   FilteredSearchResult,
-} from "../../interfaces/llm-provider";
-import {
-  generateSearchQueriesWithRetry as openaiGenerateQueriesRetry,
-} from "./query-generation";
-import {
-  analyzeRelevancyWithRetry as openaiAnalyzeRelevancyRetry,
-} from "./relevancy-analysis";
-import {
-  compileReportWithRetry as openaiCompileReportRetry,
-} from "./report-compilation";
+  TopicCluster,
+  LlmMessage,
+} from "./../../services/llm/types";
+import { generateSearchQueriesWithRetry as openaiGenerateQueriesRetry } from "./query-generation";
+import { analyzeRelevancyWithRetry as openaiAnalyzeRelevancyRetry } from "./relevancy-analysis";
+import { compileReportWithRetry as openaiCompileReportRetry } from "./report-compilation";
 import { filterSearchResultsSafe } from "./search-filtering";
 import { initializeOpenAI as initOpenAI, getClient } from "./client";
+import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import { LLMProvider } from "./../../interfaces";
 
 /**
  * OpenAI implementation of LLMProvider
@@ -38,6 +35,24 @@ export class OpenAIProvider implements LLMProvider {
       initOpenAI(apiKey);
       this.initialized = true;
     }
+  }
+  clusterByTopic?(
+    results: ResultForReport[],
+    options?: { similarityThreshold?: number }
+  ): Promise<TopicCluster[]> {
+    throw new Error("Method not implemented.");
+  }
+  compileClusteredReport?(
+    projectDescription: string,
+    clusters: TopicCluster[],
+    options?: {
+      tone?: "professional" | "casual" | "technical";
+      maxLength?: number;
+      projectTitle?: string;
+      frequency?: "daily" | "weekly" | "monthly";
+    }
+  ): Promise<CompiledReport> {
+    throw new Error("Method not implemented.");
   }
 
   /**
@@ -70,6 +85,37 @@ export class OpenAIProvider implements LLMProvider {
     }
   }
 
+  async query(messages: Array<LlmMessage>, temperature?: number): Promise<any> {
+    this.ensureInitialized();
+    const client = getClient();
+
+    const msgs: Array<ChatCompletionMessageParam> = [];
+    for (const message of messages) {
+      msgs.push({
+        role: message.role,
+        content: message.content,
+      } as ChatCompletionMessageParam);
+    }
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: temperature ?? 0.7,
+      messages: msgs,
+      response_format: {
+        type: "json_object",
+      },
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("No content in OpenAI response");
+    }
+
+    // Parse the response - handle both array and object with queries array
+    let parsed = JSON.parse(content);
+    return parsed;
+  }
+
   /**
    * Generate search queries from project description
    */
@@ -88,7 +134,7 @@ export class OpenAIProvider implements LLMProvider {
       projectDescription,
       undefined, // searchParams
       undefined, // previousQueries
-      options?.count ??1, // iteration
+      options?.count ?? 1, // iteration
       3 // maxRetries
     );
 

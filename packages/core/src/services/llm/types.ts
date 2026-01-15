@@ -101,3 +101,9 @@ export interface TopicCluster {
   combinedKeyPoints: string[]; // Merged key points from all articles
   averageScore: number; // Average relevancy score across cluster
 }
+
+export interface LlmMessage
+{
+  role: string;
+  content: string;
+}
