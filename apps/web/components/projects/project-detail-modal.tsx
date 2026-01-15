@@ -28,6 +28,7 @@ import {
 import { useDeliveryLogs } from "@/hooks/use-delivery-logs";
 import { EditProjectSettingsDialog } from "./edit-project-settings-dialog";
 import ReactMarkdown from "react-markdown";
+import { DAY_OF_WEEK_LABELS, formatDayOfMonth } from "@/lib/utils";
 
 type TabId = "overview" | "history";
 
@@ -76,7 +77,7 @@ export function ProjectDetailModal({
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-border/50">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
                 <LayoutDashboard className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -111,7 +112,7 @@ export function ProjectDetailModal({
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 rounded-t-lg transition-all duration-200 ${
                     activeTab === tab.id
-                      ? "border-cyan-500 text-cyan-400 bg-cyan-500/5"
+                      ? "border-purple-500 text-purple-400 bg-purple-500/5"
                       : "border-transparent text-muted-foreground hover:border-border hover:bg-accent hover:text-accent-foreground"
                   }`}
                 >
@@ -195,32 +196,10 @@ function OverviewTab({ project }: { project: ProjectInfo }) {
     monthly: "Monthly",
   };
 
-  const dayOfWeekLabels = [
-    "Sunday",
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-  ];
-
-  const formatDayOfMonth = (day: number) => {
-    const suffix =
-      day === 1 || day === 21 || day === 31
-        ? "st"
-        : day === 2 || day === 22
-        ? "nd"
-        : day === 3 || day === 23
-        ? "rd"
-        : "th";
-    return `${day}${suffix}`;
-  };
-
   const getFrequencyDisplay = () => {
     const baseLabel = frequencyLabels[project.frequency];
     if (project.frequency === "weekly" && project.dayOfWeek !== undefined) {
-      return `${baseLabel} (${dayOfWeekLabels[project.dayOfWeek]})`;
+      return `${baseLabel} (${DAY_OF_WEEK_LABELS[project.dayOfWeek]})`;
     }
     if (project.frequency === "monthly" && project.dayOfMonth !== undefined) {
       return `${baseLabel} (${formatDayOfMonth(project.dayOfMonth)})`;
@@ -285,7 +264,7 @@ function OverviewTab({ project }: { project: ProjectInfo }) {
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <div className="p-4 rounded-lg border border-border/50 bg-muted/20 hover:bg-muted/30 transition-colors">
             <div className="flex items-center gap-2 mb-2">
-              <Clock className="w-4 h-4 text-cyan-400" />
+              <Clock className="w-4 h-4 text-purple-400" />
               <span className="text-xs text-muted-foreground">Frequency</span>
             </div>
             <p className="font-semibold text-foreground">
@@ -295,7 +274,7 @@ function OverviewTab({ project }: { project: ProjectInfo }) {
 
           <div className="p-4 rounded-lg border border-border/50 bg-muted/20 hover:bg-muted/30 transition-colors">
             <div className="flex items-center gap-2 mb-2">
-              <Clock className="w-4 h-4 text-cyan-400" />
+              <Clock className="w-4 h-4 text-purple-400" />
               <span className="text-xs text-muted-foreground">
                 Delivery Time
               </span>
@@ -311,7 +290,7 @@ function OverviewTab({ project }: { project: ProjectInfo }) {
 
           <div className="p-4 rounded-lg border border-border/50 bg-muted/20 hover:bg-muted/30 transition-colors">
             <div className="flex items-center gap-2 mb-2">
-              <Calendar className="w-4 h-4 text-cyan-400" />
+              <Calendar className="w-4 h-4 text-purple-400" />
               <span className="text-xs text-muted-foreground">Next Run</span>
             </div>
             <p className="font-semibold text-foreground text-sm">
@@ -513,7 +492,7 @@ function DeliveryHistoryTab({ projectTitle }: { projectTitle: string }) {
                           }: {
                             children?: React.ReactNode;
                           }) => (
-                            <h2 className="text-xl font-bold text-foreground mt-10 mb-4 pb-2 border-b border-cyan-500/30">
+                            <h2 className="text-xl font-bold text-foreground mt-10 mb-4 pb-2 border-b border-purple-500/30">
                               {children}
                             </h2>
                           ),
@@ -561,7 +540,7 @@ function DeliveryHistoryTab({ projectTitle }: { projectTitle: string }) {
                           }: {
                             children?: React.ReactNode;
                           }) => (
-                            <ol className="mb-6 pl-6 space-y-3 text-foreground/80 list-decimal marker:text-cyan-400">
+                            <ol className="mb-6 pl-6 space-y-3 text-foreground/80 list-decimal marker:text-purple-400">
                               {children}
                             </ol>
                           ),
@@ -583,7 +562,7 @@ function DeliveryHistoryTab({ projectTitle }: { projectTitle: string }) {
                             }
                             return (
                               <li className="text-base leading-7 flex gap-3">
-                                <span className="text-cyan-400 mt-0.5 shrink-0">
+                                <span className="text-purple-400 mt-0.5 shrink-0">
                                   •
                                 </span>
                                 <span>{children}</span>
@@ -604,7 +583,7 @@ function DeliveryHistoryTab({ projectTitle }: { projectTitle: string }) {
                           }: {
                             children?: React.ReactNode;
                           }) => (
-                            <em className="text-foreground/90 bg-cyan-500/10 px-1 rounded not-italic">
+                            <em className="text-foreground/90 bg-purple-500/10 px-1 rounded not-italic">
                               {children}
                             </em>
                           ),
@@ -613,7 +592,7 @@ function DeliveryHistoryTab({ projectTitle }: { projectTitle: string }) {
                           }: {
                             children?: React.ReactNode;
                           }) => (
-                            <blockquote className="my-6 py-4 px-5 bg-muted/50 border-l-4 border-cyan-500 rounded-r-lg text-foreground/70">
+                            <blockquote className="my-6 py-4 px-5 bg-muted/50 border-l-4 border-purple-500 rounded-r-lg text-foreground/70">
                               {children}
                             </blockquote>
                           ),
@@ -630,7 +609,7 @@ function DeliveryHistoryTab({ projectTitle }: { projectTitle: string }) {
                                 {children}
                               </code>
                             ) : (
-                              <code className="text-sm font-mono text-cyan-200">
+                              <code className="text-sm font-mono text-purple-200">
                                 {children}
                               </code>
                             );
@@ -645,7 +624,7 @@ function DeliveryHistoryTab({ projectTitle }: { projectTitle: string }) {
                             </pre>
                           ),
                           hr: () => (
-                            <hr className="my-8 border-none h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
+                            <hr className="my-8 border-none h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent" />
                           ),
                         }}
                       >

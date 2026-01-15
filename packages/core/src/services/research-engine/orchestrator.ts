@@ -39,7 +39,7 @@ import {
   type TokenUsage,
 } from "../../utils/token-estimation";
 import { getSearchHistory, updateSearchHistory } from "./search-history";
-import { saveSearchResults, saveDeliveryLog } from "./result-storage";
+import { saveDeliveryLog } from "./result-storage";
 import type { ResearchOptions, ResearchResult } from "./types";
 import {
   getResearchConfig,
@@ -764,16 +764,8 @@ export async function executeResearchForProject(
       };
     }
 
-    // 10. Save results to Firestore
-    console.log("Saving results...");
-    let searchResultIds: string[] = [];
-    if (sortedResults.length > 0) {
-      searchResultIds = await saveSearchResults(
-        userId,
-        projectId,
-        sortedResults
-      );
-    }
+    // 10. Extract URLs for delivery log
+    const resultUrls = sortedResults.map((r) => r.url);
 
     // 10.5. Save delivery log (with compiled report)
     let deliveryLogId: string | undefined;
@@ -811,7 +803,7 @@ export async function executeResearchForProject(
         project,
         report,
         stats,
-        searchResultIds,
+        resultUrls,
         startedAt,
         Date.now()
       );

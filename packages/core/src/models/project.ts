@@ -6,7 +6,7 @@
 
 export type Frequency = "daily" | "weekly" | "monthly";
 
-export type ResultsDestination = "email" | "slack" | "sms" | "none";
+export type ResultsDestination = "email";
 
 export type ProjectStatus = "active" | "paused" | "error" | "running";
 
@@ -42,19 +42,12 @@ export interface ProjectSettings {
 }
 
 /**
- * Delivery configuration based on destination type
+ * Delivery configuration for email
  */
 export interface DeliveryConfig {
   email?: {
     address: string;
     subject?: string; // Optional custom subject line
-  };
-  slack?: {
-    webhookUrl: string;
-    channel?: string; // Optional channel override
-  };
-  sms?: {
-    phoneNumber: string; // E.164 format (e.g., +1234567890)
   };
 }
 

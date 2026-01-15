@@ -9,7 +9,7 @@ import React, { useState } from "react";
 import { View, StyleSheet, ActivityIndicator, Alert } from "react-native";
 import { Screen, Text, Button, Input, Picker } from "ui";
 import { useAuth, useProjects, signInWithGoogle, signOut } from "core";
-import type { Frequency, ResultsDestination } from "core";
+import type { Frequency } from "core";
 
 export default function IndexScreen() {
   const { user, loading: authLoading } = useAuth();
@@ -22,8 +22,6 @@ export default function IndexScreen() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [frequency, setFrequency] = useState<Frequency>("daily");
-  const [resultsDestination, setResultsDestination] =
-    useState<ResultsDestination>("email");
   const [isCreating, setIsCreating] = useState(false);
 
   const handleSignIn = async () => {
@@ -62,14 +60,13 @@ export default function IndexScreen() {
         title: title.trim(),
         description: description.trim(),
         frequency,
-        resultsDestination,
+        resultsDestination: "email",
       });
 
       // Clear form
       setTitle("");
       setDescription("");
       setFrequency("daily");
-      setResultsDestination("email");
 
       Alert.alert("Success", "Project created!");
     } catch (error) {
@@ -165,17 +162,6 @@ export default function IndexScreen() {
           ]}
         />
 
-        <Picker
-          label="Results Destination"
-          value={resultsDestination}
-          onValueChange={setResultsDestination}
-          options={[
-            { label: "Email", value: "email" },
-            { label: "Slack", value: "slack" },
-            { label: "None (view in app)", value: "none" },
-          ]}
-        />
-
         <Button
           title={isCreating ? "Creating..." : "Create Project"}
           onPress={handleCreateProject}
@@ -204,10 +190,7 @@ export default function IndexScreen() {
                 {project.description}
               </Text>
               <View style={styles.projectMeta}>
-                <Text variant="caption">
-                  Frequency: {project.frequency} | Destination:{" "}
-                  {project.resultsDestination}
-                </Text>
+                <Text variant="caption">Frequency: {project.frequency}</Text>
                 <Text variant="caption">
                   Created: {new Date(project.createdAt).toLocaleDateString()}
                 </Text>

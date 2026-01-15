@@ -425,9 +425,8 @@ const routes: FastifyPluginAsync = async (app) => {
             projectId,
             userId,
             destination,
-            destinationAddress,
             stats,
-            searchResultIds,
+            resultUrls,
             ...data
           } = doc.data() as DeliveryLog;
           return data as RelevxDeliveryLog;

@@ -42,8 +42,7 @@ export interface DeliveryLog {
   userId: string; // Owner user ID
 
   // Delivery information
-  destination: "email" | "slack" | "sms"; // Where it was delivered
-  destinationAddress: string; // Email/phone/webhook that received it
+  destination: "email"; // Where it was delivered
 
   // Report content
   reportMarkdown: string; // The compiled markdown report
@@ -59,7 +58,7 @@ export interface DeliveryLog {
   retryCount: number; // Number of delivery retry attempts
 
   // References
-  searchResultIds: string[]; // IDs of SearchResults included in this report
+  resultUrls: string[]; // URLs of results included in this report
 
   // Timestamps
   researchStartedAt: number; // When the research process started
@@ -74,13 +73,7 @@ export interface NewDeliveryLog extends Omit<DeliveryLog, "id"> {}
 export interface RelevxDeliveryLog
   extends Omit<
     DeliveryLog,
-    | "id"
-    | "projectId"
-    | "userId"
-    | "destination"
-    | "destinationAddress"
-    | "stats"
-    | "searchResultIds"
+    "id" | "projectId" | "userId" | "destination" | "stats" | "resultUrls"
   > {}
 
 /**
@@ -89,7 +82,7 @@ export interface RelevxDeliveryLog
 export interface DeliveryLogSummary {
   id: string;
   projectId: string;
-  destination: "email" | "slack" | "sms";
+  destination: "email";
   status: "success" | "failed" | "partial";
   deliveredAt: number;
   includedResults: number;

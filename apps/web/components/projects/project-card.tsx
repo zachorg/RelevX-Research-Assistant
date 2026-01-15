@@ -28,25 +28,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import {
-  MoreVertical,
-  Settings,
-  Trash2,
-  Clock,
-  Mail,
-  Calendar,
-  Circle,
-} from "lucide-react";
+import { MoreVertical, Settings, Trash2, Clock, Calendar } from "lucide-react";
 import { DeleteProjectDialog } from "./delete-project-dialog";
 import { EditProjectSettingsDialog } from "./edit-project-settings-dialog";
 import { ProjectDetailModal } from "./project-detail-modal";
+import { DAY_OF_WEEK_LABELS, formatDayOfMonth } from "@/lib/utils";
 
 interface ProjectCardProps {
   project: ProjectInfo;
 }
 
 export function ProjectCard({ project }: ProjectCardProps) {
-  const { toggleProjectStatus, deleteProject } = useProjects({ subscribe: false });
+  const { toggleProjectStatus, deleteProject } = useProjects({
+    subscribe: false,
+  });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
@@ -68,22 +63,15 @@ export function ProjectCard({ project }: ProjectCardProps) {
     monthly: "Monthly",
   };
 
-  const destinationLabels = {
-    email: "Email",
-    slack: "Slack",
-    sms: "SMS",
-    none: "In-App Only",
-  };
-
-  const getDestinationIcon = () => {
-    switch (project.resultsDestination) {
-      case "email":
-        return <Mail className="w-4 h-4" />;
-      case "slack":
-        return <Mail className="w-4 h-4" />; // You could use a Slack icon here
-      default:
-        return <Circle className="w-4 h-4" />;
+  const getFrequencyDisplay = () => {
+    const baseLabel = frequencyLabels[project.frequency];
+    if (project.frequency === "weekly" && project.dayOfWeek !== undefined) {
+      return `${baseLabel} (${DAY_OF_WEEK_LABELS[project.dayOfWeek]})`;
     }
+    if (project.frequency === "monthly" && project.dayOfMonth !== undefined) {
+      return `${baseLabel} (${formatDayOfMonth(project.dayOfMonth)})`;
+    }
+    return baseLabel;
   };
 
   const formatTime12Hour = (time24: string) => {
@@ -132,8 +120,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
   return (
     <>
       <Card
-        className={`group hover:shadow-xl hover:shadow-primary/10 hover:scale-[1.02] transition-all duration-300 glass-dark h-full flex flex-col cursor-pointer ${project.status === "running" ? "!border-red-500 !border-2" : ""
-          }`}
+        className={`group hover:shadow-xl hover:shadow-primary/10 hover:scale-[1.02] transition-all duration-300 glass-dark h-full flex flex-col cursor-pointer ${
+          project.status === "running" ? "!border-red-500 !border-2" : ""
+        }`}
         onClick={handleCardClick}
       >
         <CardHeader>
@@ -141,7 +130,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
                 <Switch
-                  checked={project.status === "active" || project.status === "running"}
+                  checked={
+                    project.status === "active" || project.status === "running"
+                  }
                   onCheckedChange={handleToggleActive}
                   disabled={isToggling}
                 />
@@ -208,9 +199,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             <div className="flex items-center gap-2 text-sm">
               <Clock className="w-4 h-4 text-muted-foreground" />
               <span className="text-muted-foreground">Frequency:</span>
-              <span className="font-medium">
-                {frequencyLabels[project.frequency]}
-              </span>
+              <span className="font-medium">{getFrequencyDisplay()}</span>
             </div>
 
             {project.deliveryTime && project.timezone && (
@@ -224,14 +213,6 @@ export function ProjectCard({ project }: ProjectCardProps) {
                 </span>
               </div>
             )}
-
-            <div className="flex items-center gap-2 text-sm">
-              {getDestinationIcon()}
-              <span className="text-muted-foreground">Delivery:</span>
-              <span className="font-medium">
-                {destinationLabels[project.resultsDestination]}
-              </span>
-            </div>
           </div>
         </CardContent>
 
@@ -283,7 +264,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
               onClick={() =>
                 setErrorDialog((prev) => ({ ...prev, open: false }))
               }
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300"
+              className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300"
             >
               OK
             </Button>

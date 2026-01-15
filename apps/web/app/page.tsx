@@ -56,8 +56,7 @@ export default function HomePage() {
     {
       icon: Mail,
       title: "Delivered to You",
-      description:
-        "Get curated insights delivered straight to your inbox or Slack",
+      description: "Get curated insights delivered straight to your inbox",
     },
     {
       icon: Zap,
@@ -136,7 +135,8 @@ export default function HomePage() {
               >
                 Get Started Free
                 <ArrowRight className="w-5 h-5" />
-              </Button>)}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="lg"
@@ -274,8 +274,7 @@ export default function HomePage() {
                   onClick={() => {
                     if (!userProfile) {
                       handleSignIn();
-                    }
-                    else {
+                    } else {
                       router.push("/projects");
                     }
                   }}
